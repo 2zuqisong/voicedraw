@@ -1,5 +1,6 @@
 use crate::engine::AppEngine;
 use crate::preprocessor::{self, PreprocessResult};
+use crate::llm;
 use tauri::Emitter;
 
 // 全局 engine 实例
@@ -18,12 +19,34 @@ pub async fn process_command(
             execute_quick_action(&action, &params, &app)
         }
         PreprocessResult::NeedsLLM { cleaned_text } => {
-            // Phase 5 将在这里接入 LLM 调度器
-            Ok(serde_json::json!({
-                "success": false,
-                "message": format!("LLM 尚未集成，收到指令: {}", cleaned_text),
-                "canvas_state": null
-            }))
+            // 从环境变量读取 API Key（后续 Phase 7 改为配置）
+            let api_key = std::env::var("DEEPSEEK_API_KEY")
+                .unwrap_or_else(|_| "sk-placeholder".into());
+
+            let scheduler = llm::scheduler::LLMScheduler::new(api_key);
+            let history: Vec<(String, String)> = vec![]; // TODO: Phase 6 接入对话历史
+
+            match scheduler.process(&cleaned_text, &history, &ENGINE).await {
+                Ok(result) => {
+                    // 保存快照用于 undo/redo
+                    if let Some(ref state) = result.canvas_state {
+                        ENGINE.snapshots.lock().unwrap().save(state.clone());
+                        let _ = app.emit("canvas-updated", state);
+                    }
+                    Ok(serde_json::json!({
+                        "success": true,
+                        "message": result.message,
+                        "canvas_state": result.canvas_state
+                    }))
+                }
+                Err(e) => {
+                    Ok(serde_json::json!({
+                        "success": false,
+                        "message": format!("LLM 处理失败: {}", e),
+                        "canvas_state": null
+                    }))
+                }
+            }
         }
     }
 }
