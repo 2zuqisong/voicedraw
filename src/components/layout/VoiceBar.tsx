@@ -1,10 +1,16 @@
+import { useCallback, useRef } from "react";
 import { useAppStore } from "../../store";
 import { useVoiceRecognition } from "../../hooks/useVoiceRecognition";
+import WaveformVisualizer from "../voice/WaveformVisualizer";
 
-/**
- * 底部语音控制栏
- * 使用 Web Speech API 进行语音识别
- */
+const STATUS_TEXT: Record<string, string> = {
+  idle: "👆 按住说话，或说「开始画图」唤醒",
+  listening: "🎤 正在听...",
+  thinking: "🤔 正在理解...",
+  executing: "✏️ 正在绘图...",
+  error: "❌ 出错了，点击重试",
+};
+
 export default function VoiceBar() {
   const isListening = useAppStore((s) => s.isListening);
   const transcript = useAppStore((s) => s.transcript);
@@ -13,35 +19,51 @@ export default function VoiceBar() {
   const setStatus = useAppStore((s) => s.setStatus);
   const quickAction = useAppStore((s) => s.quickAction);
 
-  const { start, stop } = useVoiceRecognition({
-    onResult: (text) => {
-      setTranscript(text);
-    },
-    onError: (error) => {
-      console.error(error);
-      setTranscript("");
-      setStatus("error");
-      setTimeout(() => setStatus("idle"), 2000);
-    },
-    onEnd: () => {
-      const state = useAppStore.getState();
-      const finalText = state.transcript.trim();
-      if (finalText.length > 0) {
-        state.submitCommand(finalText);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTextRef = useRef("");
+
+  const handleResult = useCallback((text: string, _isFinal: boolean) => {
+    setTranscript(text);
+    lastTextRef.current = text;
+
+    // 2 秒静默后自动提交
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = setTimeout(() => {
+      if (lastTextRef.current.trim().length > 0) {
+        stop();
+        useAppStore.setState({ isListening: false });
       }
-      // 不在 onEnd 中重置 isListening，因为 submitCommand 内部会改 status
-    },
+    }, 2000);
+  }, [setTranscript]);
+
+  const handleError = useCallback((error: string) => {
+    console.error("STT Error:", error);
+    setStatus("error");
+    setTimeout(() => setStatus("idle"), 2000);
+  }, [setStatus]);
+
+  const handleEnd = useCallback(() => {
+    // recognition 自然结束
+  }, []);
+
+  const { start, stop } = useVoiceRecognition({
+    onResult: handleResult,
+    onError: handleError,
+    onEnd: handleEnd,
   });
 
-  const handleToggle = () => {
-    if (isListening) {
-      stop();
-      useAppStore.setState({ isListening: false });
-    } else {
-      setTranscript("");
-      useAppStore.setState({ isListening: true, status: "listening" });
-      start();
-    }
+  // 按住说话
+  const handlePointerDown = () => {
+    if (status !== "idle" && status !== "listening") return;
+    setTranscript("");
+    useAppStore.setState({ isListening: true, status: "listening" });
+    start();
+  };
+
+  const handlePointerUp = () => {
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    stop();
+    useAppStore.setState({ isListening: false });
   };
 
   return (
@@ -59,46 +81,59 @@ export default function VoiceBar() {
       boxShadow: "0 2px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
       border: "1px solid #e8eaed",
       zIndex: 100,
-      minWidth: 520,
+      minWidth: 560,
+      userSelect: "none",
     }}>
-      <button
-        onClick={handleToggle}
-        disabled={status !== "idle" && status !== "listening"}
+      {/* 波形可视化 */}
+      <WaveformVisualizer isActive={isListening} />
+
+      {/* 语音输入区域 — 按住说话 */}
+      <div
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: "50%",
-          border: "none",
-          background: isListening ? "#ea4335" : "#f1f3f4",
-          color: isListening ? "#fff" : "#5f6368",
-          fontSize: 18,
-          cursor: "pointer",
-          transition: "all 0.2s",
+          flex: 1,
+          height: 36,
+          borderRadius: 20,
+          background: isListening
+            ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+            : "#f1f3f4",
+          border: isListening ? "2px solid #667eea" : "2px solid transparent",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          flexShrink: 0,
+          cursor: "pointer",
+          transition: "all 0.2s",
+          padding: "0 14px",
+          overflow: "hidden",
         }}
       >
-        🎤
-      </button>
-
-      <div style={{
-        flex: 1,
-        height: 36,
-        lineHeight: "36px",
-        padding: "0 14px",
-        borderRadius: 20,
-        background: "#f1f3f4",
-        color: isListening ? "#1f2328" : "#9aa0a6",
-        fontSize: 14,
-        overflow: "hidden",
-        whiteSpace: "nowrap",
-        textOverflow: "ellipsis",
-      }}>
-        {transcript || (isListening ? "请说话..." : "点击麦克风开始语音指令")}
+        <span style={{
+          color: isListening ? "#fff" : "#9aa0a6",
+          fontSize: 13,
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+        }}>
+          {isListening
+            ? (transcript || "正在听...")
+            : STATUS_TEXT[status] || STATUS_TEXT.idle}
+        </span>
       </div>
 
+      {/* 字数统计 */}
+      <span style={{
+        fontSize: 11,
+        color: "#9aa0a6",
+        minWidth: 36,
+        textAlign: "right",
+        flexShrink: 0,
+      }}>
+        {transcript.length > 0 ? `${transcript.length} 字` : ""}
+      </span>
+
+      {/* 撤销 / 重做 */}
       <button
         onClick={() => quickAction("undo")}
         disabled={status !== "idle"}
@@ -107,11 +142,12 @@ export default function VoiceBar() {
           borderRadius: 20,
           border: "1px solid #e8eaed",
           background: "#fff",
-          color: "#5f6368",
-          cursor: "pointer",
+          color: status !== "idle" ? "#ccc" : "#5f6368",
+          cursor: status !== "idle" ? "default" : "pointer",
           fontSize: 12,
           fontWeight: 500,
           whiteSpace: "nowrap",
+          flexShrink: 0,
         }}
       >
         ↩ 撤销
@@ -124,11 +160,12 @@ export default function VoiceBar() {
           borderRadius: 20,
           border: "1px solid #e8eaed",
           background: "#fff",
-          color: "#5f6368",
-          cursor: "pointer",
+          color: status !== "idle" ? "#ccc" : "#5f6368",
+          cursor: status !== "idle" ? "default" : "pointer",
           fontSize: 12,
           fontWeight: 500,
           whiteSpace: "nowrap",
+          flexShrink: 0,
         }}
       >
         ↪ 重做
