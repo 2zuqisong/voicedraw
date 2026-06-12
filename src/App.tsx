@@ -16,8 +16,10 @@ function App() {
   return (
     <div className="app-container">
       <TopBar />
-      <CanvasView canvasState={canvasState} />
-      <VoiceBar />
+      <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
+        <CanvasView canvasState={canvasState} />
+        <VoiceBar />
+      </div>
     </div>
   );
 }

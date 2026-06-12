@@ -88,28 +88,38 @@ export default function VoiceBar() {
 
   return (
     <footer className="voice-bar" style={{
-      height: 72,
+      position: "absolute",
+      bottom: 16,
+      left: "50%",
+      transform: "translateX(-50%)",
       display: "flex",
       alignItems: "center",
-      gap: 12,
-      padding: "0 16px",
-      background: "#16213e",
-      borderTop: "1px solid #0f3460",
-      flexShrink: 0,
+      gap: 10,
+      padding: "8px 14px",
+      background: "#ffffff",
+      borderRadius: 40,
+      boxShadow: "0 2px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+      border: "1px solid #e8eaed",
+      zIndex: 100,
+      minWidth: 520,
     }}>
       <button
         onClick={handleToggle}
         disabled={status !== "idle" && status !== "listening"}
         style={{
-          width: 44,
-          height: 44,
+          width: 40,
+          height: 40,
           borderRadius: "50%",
           border: "none",
-          background: isListening ? "#e94560" : "#0f3460",
-          color: "#fff",
-          fontSize: 20,
+          background: isListening ? "#ea4335" : "#f1f3f4",
+          color: isListening ? "#fff" : "#5f6368",
+          fontSize: 18,
           cursor: "pointer",
-          transition: "background 0.2s",
+          transition: "all 0.2s",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
         }}
       >
         🎤
@@ -119,10 +129,10 @@ export default function VoiceBar() {
         flex: 1,
         height: 36,
         lineHeight: "36px",
-        padding: "0 12px",
-        borderRadius: 8,
-        background: "#0f3460",
-        color: isListening ? "#fff" : "#888",
+        padding: "0 14px",
+        borderRadius: 20,
+        background: "#f1f3f4",
+        color: isListening ? "#1f2328" : "#9aa0a6",
         fontSize: 14,
         overflow: "hidden",
         whiteSpace: "nowrap",
@@ -135,13 +145,15 @@ export default function VoiceBar() {
         onClick={() => quickAction("undo")}
         disabled={status !== "idle"}
         style={{
-          padding: "6px 12px",
-          borderRadius: 6,
-          border: "1px solid #0f3460",
-          background: "transparent",
-          color: "#aaa",
+          padding: "6px 14px",
+          borderRadius: 20,
+          border: "1px solid #e8eaed",
+          background: "#fff",
+          color: "#5f6368",
           cursor: "pointer",
           fontSize: 12,
+          fontWeight: 500,
+          whiteSpace: "nowrap",
         }}
       >
         ↩ 撤销
@@ -150,13 +162,15 @@ export default function VoiceBar() {
         onClick={() => quickAction("redo")}
         disabled={status !== "idle"}
         style={{
-          padding: "6px 12px",
-          borderRadius: 6,
-          border: "1px solid #0f3460",
-          background: "transparent",
-          color: "#aaa",
+          padding: "6px 14px",
+          borderRadius: 20,
+          border: "1px solid #e8eaed",
+          background: "#fff",
+          color: "#5f6368",
           cursor: "pointer",
           fontSize: 12,
+          fontWeight: 500,
+          whiteSpace: "nowrap",
         }}
       >
         ↪ 重做
