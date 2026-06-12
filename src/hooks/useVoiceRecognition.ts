@@ -7,6 +7,10 @@ interface UseVoiceRecognitionOptions {
   lang?: string;
 }
 
+function isSpeechSupported(): boolean {
+  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
 export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
   const { onResult, onError, onEnd, lang = "zh-CN" } = options;
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -65,5 +69,5 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
     }
   }, []);
 
-  return { start, stop, abort };
+  return { start, stop, abort, isSupported: isSpeechSupported() };
 }
