@@ -20,22 +20,11 @@ export default function VoiceBar() {
   const submitCommand = useAppStore((s) => s.submitCommand);
   const quickAction = useAppStore((s) => s.quickAction);
 
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTextRef = useRef("");
 
   const handleResult = useCallback((text: string, _isFinal: boolean) => {
     setTranscript(text);
     lastTextRef.current = text;
-
-    // 2 秒静默后自动提交
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-    silenceTimerRef.current = setTimeout(() => {
-      if (lastTextRef.current.trim().length > 0) {
-        stop();
-        useAppStore.setState({ isListening: false });
-        submitCommand(lastTextRef.current.trim());
-      }
-    }, 2000);
   }, [setTranscript]);
 
   const handleError = useCallback((error: string) => {
@@ -64,7 +53,6 @@ export default function VoiceBar() {
 
   // 确认提交
   const handleConfirm = () => {
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     stop();
     useAppStore.setState({ isListening: false });
     const text = lastTextRef.current.trim();
@@ -75,7 +63,6 @@ export default function VoiceBar() {
 
   // 取消录音
   const handleCancel = () => {
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     abort();
     setTranscript("");
     useAppStore.setState({ isListening: false, status: "idle" });
