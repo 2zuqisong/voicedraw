@@ -4,8 +4,8 @@ import { useVoiceRecognition } from "../../hooks/useVoiceRecognition";
 import WaveformVisualizer from "../voice/WaveformVisualizer";
 
 const STATUS_TEXT: Record<string, string> = {
-  idle: "👆 按住说话，或说「开始画图」唤醒",
-  listening: "🎤 正在听...",
+  idle: "点击麦克风开始语音指令",
+  listening: "正在聆听...",
   thinking: "🤔 正在理解...",
   executing: "✏️ 正在绘图...",
   error: "❌ 出错了，点击重试",
@@ -46,25 +46,36 @@ export default function VoiceBar() {
     // recognition 自然结束
   }, []);
 
-  const { start, stop } = useVoiceRecognition({
+  const { start, stop, abort } = useVoiceRecognition({
     onResult: handleResult,
     onError: handleError,
     onEnd: handleEnd,
   });
 
-  // 按住说话
-  const handlePointerDown = () => {
-    if (status !== "idle" && status !== "listening") return;
+  // 开始录音
+  const handleStart = () => {
+    if (status !== "idle") return;
     setTranscript("");
     useAppStore.setState({ isListening: true, status: "listening" });
     start();
   };
 
-  const handlePointerUp = () => {
+  // 确认提交
+  const handleConfirm = () => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     stop();
     useAppStore.setState({ isListening: false });
   };
+
+  // 取消录音
+  const handleCancel = () => {
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    abort();
+    setTranscript("");
+    useAppStore.setState({ isListening: false, status: "idle" });
+  };
+
+  const isBusy = status !== "idle" && status !== "listening";
 
   return (
     <footer className="voice-bar" style={{
@@ -87,11 +98,34 @@ export default function VoiceBar() {
       {/* 波形可视化 */}
       <WaveformVisualizer isActive={isListening} />
 
-      {/* 语音输入区域 — 按住说话 */}
+      {/* 取消按钮 — 仅在录音中显示 */}
+      {isListening && (
+        <button
+          onClick={handleCancel}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            border: "none",
+            background: "#ea4335",
+            color: "#fff",
+            fontSize: 18,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            transition: "all 0.2s",
+          }}
+          title="取消"
+        >
+          ✕
+        </button>
+      )}
+
+      {/* 语音输入区域 */}
       <div
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        onClick={isListening ? undefined : handleStart}
         style={{
           flex: 1,
           height: 36,
@@ -103,7 +137,7 @@ export default function VoiceBar() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          cursor: "pointer",
+          cursor: isBusy ? "default" : "pointer",
           transition: "all 0.2s",
           padding: "0 14px",
           overflow: "hidden",
@@ -121,6 +155,31 @@ export default function VoiceBar() {
             : STATUS_TEXT[status] || STATUS_TEXT.idle}
         </span>
       </div>
+
+      {/* 确认按钮 — 仅在录音中且有内容时显示 */}
+      {isListening && (
+        <button
+          onClick={handleConfirm}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            border: "none",
+            background: transcript.trim().length > 0 ? "#34a853" : "#dadce0",
+            color: transcript.trim().length > 0 ? "#fff" : "#9aa0a6",
+            fontSize: 18,
+            cursor: transcript.trim().length > 0 ? "pointer" : "default",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            transition: "all 0.2s",
+          }}
+          title="确认"
+        >
+          ✓
+        </button>
+      )}
 
       {/* 字数统计 */}
       <span style={{
