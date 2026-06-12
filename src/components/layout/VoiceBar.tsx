@@ -17,6 +17,7 @@ export default function VoiceBar() {
   const status = useAppStore((s) => s.status);
   const setTranscript = useAppStore((s) => s.setTranscript);
   const setStatus = useAppStore((s) => s.setStatus);
+  const submitCommand = useAppStore((s) => s.submitCommand);
   const quickAction = useAppStore((s) => s.quickAction);
 
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -32,6 +33,7 @@ export default function VoiceBar() {
       if (lastTextRef.current.trim().length > 0) {
         stop();
         useAppStore.setState({ isListening: false });
+        submitCommand(lastTextRef.current.trim());
       }
     }, 2000);
   }, [setTranscript]);
@@ -65,6 +67,10 @@ export default function VoiceBar() {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     stop();
     useAppStore.setState({ isListening: false });
+    const text = lastTextRef.current.trim();
+    if (text.length > 0) {
+      submitCommand(text);
+    }
   };
 
   // 取消录音
