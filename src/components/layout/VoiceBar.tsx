@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { useAppStore } from "../../store";
+import { useVoiceRecognition } from "../../hooks/useVoiceRecognition";
 
 /**
  * 底部语音控制栏
@@ -9,80 +9,38 @@ export default function VoiceBar() {
   const isListening = useAppStore((s) => s.isListening);
   const transcript = useAppStore((s) => s.transcript);
   const status = useAppStore((s) => s.status);
-  const startListening = useAppStore((s) => s.startListening);
-  const stopListening = useAppStore((s) => s.stopListening);
   const setTranscript = useAppStore((s) => s.setTranscript);
+  const setStatus = useAppStore((s) => s.setStatus);
   const quickAction = useAppStore((s) => s.quickAction);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  useEffect(() => {
-    const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.warn("Web Speech API 不可用");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "zh-CN";
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 2;
-
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = "";
-      let final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          final += result[0].transcript;
-        } else {
-          interim += result[0].transcript;
-        }
+  const { start, stop } = useVoiceRecognition({
+    onResult: (text) => {
+      setTranscript(text);
+    },
+    onError: (error) => {
+      console.error(error);
+      setTranscript("");
+      setStatus("error");
+      setTimeout(() => setStatus("idle"), 2000);
+    },
+    onEnd: () => {
+      const state = useAppStore.getState();
+      const finalText = state.transcript.trim();
+      if (finalText.length > 0) {
+        state.submitCommand(finalText);
       }
-      setTranscript(final + interim);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error("语音识别错误:", event.error);
-      stopListening();
-    };
-
-    recognition.onend = () => {
-      // 如果用户仍然在聆听状态，自动重启
-      if (useAppStore.getState().isListening) {
-        recognition.start();
-      } else {
-        // 识别结束后提交
-        const text = useAppStore.getState().transcript.trim();
-        if (text.length > 0) {
-          useAppStore.getState().submitCommand(text);
-        }
-      }
-    };
-
-    recognitionRef.current = recognition;
-    return () => { recognition.stop(); };
-  }, []);
-
-  // 控制识别启停
-  useEffect(() => {
-    const rec = recognitionRef.current;
-    if (!rec) return;
-    try {
-      if (isListening) {
-        rec.start();
-      } else {
-        rec.stop();
-      }
-    } catch {
-      // 忽略重复 start/stop 的错误
-    }
-  }, [isListening]);
+      // 不在 onEnd 中重置 isListening，因为 submitCommand 内部会改 status
+    },
+  });
 
   const handleToggle = () => {
     if (isListening) {
-      stopListening();
+      stop();
+      useAppStore.setState({ isListening: false });
     } else {
-      startListening();
+      setTranscript("");
+      useAppStore.setState({ isListening: true, status: "listening" });
+      start();
     }
   };
 
