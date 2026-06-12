@@ -1,7 +1,7 @@
 pub mod canvas_state;
 pub mod node_ops;
 pub mod edge_ops;
-// pub mod layout;      // TODO: Phase 1 Task 5
+pub mod layout;   
 // pub mod style_ops;   // TODO: Phase 1 Task 6
 pub mod snapshot;
 
