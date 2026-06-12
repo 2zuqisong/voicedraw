@@ -1,15 +1,15 @@
 mod engine;
-
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("你好, {}! Rust 后端已就绪。", name)
-}
+mod commands;
+mod preprocessor;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            commands::process_command,
+            commands::quick_action,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
