@@ -1,18 +1,23 @@
-import { invoke } from "@tauri-apps/api/core";
-import { useState } from "react";
+import { useEffect } from "react";
+import CanvasView from "./components/canvas/CanvasView";
+import TopBar from "./components/layout/TopBar";
+import VoiceBar from "./components/layout/VoiceBar";
+import { useAppStore } from "./store";
+import "./App.css";
 
 function App() {
-  const [msg, setMsg] = useState("");
+  const canvasState = useAppStore((s) => s.canvasState);
+  const initEventListener = useAppStore((s) => s._initEventListener);
 
-  const testInvoke = async () => {
-    const response: string = await invoke("greet", { name: "世界" });
-    setMsg(response);
-  };
+  useEffect(() => {
+    initEventListener();
+  }, []);
 
   return (
-    <div>
-      <button onClick={testInvoke}>测试 Rust 通信</button>
-      <p>{msg}</p>
+    <div className="app-container">
+      <TopBar />
+      <CanvasView canvasState={canvasState} />
+      <VoiceBar />
     </div>
   );
 }
