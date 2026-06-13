@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import CanvasView from "./components/canvas/CanvasView";
 import CanvasOverlay from "./components/canvas/CanvasOverlay";
 import OperationPreview from "./components/canvas/OperationPreview";
+import ChatBubble from "./components/status/ChatBubble";
 import TopBar from "./components/layout/TopBar";
 import VoiceBar from "./components/layout/VoiceBar";
 import Toast from "./components/status/Toast";
@@ -24,6 +25,7 @@ function App() {
         <CanvasView canvasState={canvasState} />
         <CanvasOverlay />
         <OperationPreview />
+        <ChatBubble />
         <VoiceBar />
       </div>
     </div>
