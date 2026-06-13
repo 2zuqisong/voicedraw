@@ -29,9 +29,11 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // 从 0 遍历全部累积结果（而非 event.resultIndex），确保停顿前后的
+      // 语音内容被完整拼接，不会因中途暂停而被覆盖。
       let transcript = "";
       let isFinal = false;
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           isFinal = true;

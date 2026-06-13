@@ -89,6 +89,30 @@ export interface OperationResult {
   success: boolean;
   message: string;
   canvas_state: CanvasState | null;
+  pending_plan: OperationPlan | null;
+}
+
+/** 操作计划（预览确认用） */
+export interface OperationPlan {
+  id: string;
+  diagram_type: string;
+  summary: string;
+  nodes: PlanNode[];
+  edges: PlanEdge[];
+  grid_position: [number, number] | null;
+  layout_direction: "top_down" | "left_right";
+  estimated_tool_calls: number;
+}
+
+export interface PlanNode {
+  label: string;
+  type: string;
+}
+
+export interface PlanEdge {
+  from: string;
+  to: string;
+  label: string | null;
 }
 
 /** 对话消息 */

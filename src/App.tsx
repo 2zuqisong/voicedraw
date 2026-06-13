@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import CanvasView from "./components/canvas/CanvasView";
 import CanvasOverlay from "./components/canvas/CanvasOverlay";
+import OperationPreview from "./components/canvas/OperationPreview";
 import TopBar from "./components/layout/TopBar";
 import VoiceBar from "./components/layout/VoiceBar";
 import Toast from "./components/status/Toast";
@@ -22,6 +23,7 @@ function App() {
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <CanvasView canvasState={canvasState} />
         <CanvasOverlay />
+        <OperationPreview />
         <VoiceBar />
       </div>
     </div>

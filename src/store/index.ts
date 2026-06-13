@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { CanvasState, AppStatus, ConversationMessage, OperationResult } from "./types";
+import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan } from "./types";
 
 interface AppState {
   // 语音状态
@@ -15,6 +15,12 @@ interface AppState {
 
   // 对话历史
   conversation: ConversationMessage[];
+
+  // 操作计划
+  pendingPlan: OperationPlan | null;
+  confirmPlan: () => Promise<void>;
+  cancelPlan: () => Promise<void>;
+  modifyPlan: (newText: string) => Promise<void>;
 
   // 动作
   startListening: () => void;
@@ -36,6 +42,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   canvasState: null,
   lastOperation: "",
   conversation: [],
+  pendingPlan: null,
 
   startListening: () => set({ isListening: true, status: "listening", transcript: "" }),
   
@@ -55,7 +62,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ status: "thinking", lastOperation: text });
     try {
       const result = await invoke<OperationResult>("process_command", { text });
-      if (result.success && result.canvas_state) {
+      if (result.pending_plan) {
+        // 复杂指令：显示预览面板
+        set({
+          pendingPlan: result.pending_plan,
+          status: "idle",
+          lastOperation: result.message,
+        });
+      } else if (result.success && result.canvas_state) {
         set({
           canvasState: result.canvas_state,
           status: "idle",
@@ -97,6 +111,66 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  confirmPlan: async () => {
+    const plan = get().pendingPlan;
+    if (!plan) return;
+    set({ status: "executing", lastOperation: `执行: ${plan.summary}` });
+    try {
+      const result = await invoke<OperationResult>("confirm_plan");
+      if (result.success && result.canvas_state) {
+        set({
+          canvasState: result.canvas_state,
+          pendingPlan: null,
+          status: "idle",
+          lastOperation: result.message,
+          conversation: [
+            ...get().conversation,
+            { role: "user" as const, content: `确认执行: ${plan.summary}` },
+            { role: "assistant" as const, content: result.message },
+          ].slice(-10),
+        });
+      } else {
+        set({ status: "error", pendingPlan: null, lastOperation: result.message || "执行失败" });
+        setTimeout(() => set({ status: "idle" }), 3000);
+      }
+    } catch (err) {
+      set({ status: "error", pendingPlan: null, lastOperation: String(err) });
+      setTimeout(() => set({ status: "idle" }), 3000);
+    }
+  },
+
+  cancelPlan: async () => {
+    try {
+      await invoke("cancel_plan");
+    } catch { /* 忽略 */ }
+    set({ pendingPlan: null, status: "idle", lastOperation: "已取消" });
+  },
+
+  modifyPlan: async (newText) => {
+    const plan = get().pendingPlan;
+    if (!plan) return;
+    set({ status: "thinking", lastOperation: newText });
+    try {
+      const result = await invoke<OperationResult>("modify_plan", { newText });
+      if (result.pending_plan) {
+        set({ pendingPlan: result.pending_plan, status: "idle", lastOperation: result.message });
+      } else if (result.success && result.canvas_state) {
+        set({
+          canvasState: result.canvas_state,
+          pendingPlan: null,
+          status: "idle",
+          lastOperation: result.message,
+        });
+      } else {
+        set({ status: "error", pendingPlan: null, lastOperation: result.message || "修改失败" });
+        setTimeout(() => set({ status: "idle" }), 3000);
+      }
+    } catch (err) {
+      set({ status: "error", pendingPlan: null, lastOperation: String(err) });
+      setTimeout(() => set({ status: "idle" }), 3000);
+    }
+  },
+
   setStatus: (status) => set({ status }),
 
   _updateCanvasState: (state) => set({ canvasState: state }),
@@ -104,7 +178,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   _initEventListener: async () => {
     // 监听 Rust 端推送的 canvas 更新事件
     await listen<CanvasState>("canvas-updated", (event) => {
-      set({ canvasState: event.payload, status: "idle" });
+      set({ canvasState: event.payload, status: "idle", pendingPlan: null });
     });
   },
 }));

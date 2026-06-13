@@ -66,6 +66,11 @@ impl ConversationContext {
             .collect()
     }
 
+    /// 获取最近一次用户输入的文本
+    pub fn last_user_text(&self) -> Option<String> {
+        self.turns.last().map(|t| t.user_text.clone())
+    }
+
     /// 在历史中搜索可能的节点引用
     /// 比如用户说「那个菱形」，找到上一轮中创建的 Decision 类型节点
     pub fn resolve_reference(
