@@ -154,4 +154,7 @@ pub struct CanvasState {
     pub theme: Theme,
     pub width: f64,
     pub height: f64,
+    pub grid_size: f64,
+    pub grid_origin_x: f64,
+    pub grid_origin_y: f64,
 }

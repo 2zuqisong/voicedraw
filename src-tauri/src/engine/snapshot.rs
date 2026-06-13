@@ -90,6 +90,9 @@ mod tests {
             theme: Theme::Default,
             width: 800.0,
             height: 600.0,
+            grid_size: 20.0,
+            grid_origin_x: 40.0,
+            grid_origin_y: 24.0,
         }
     }
 
