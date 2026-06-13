@@ -75,6 +75,8 @@ pub struct LLMScheduler {
     client: DeepSeekClient,
     max_rounds: u8,
     plan_cache: Option<OperationPlan>,
+    /// 触发当前 plan 的原始用户文本（用于 confirm_plan 时恢复）
+    pub(crate) cached_user_text: Option<String>,
 }
 
 impl LLMScheduler {
@@ -83,6 +85,7 @@ impl LLMScheduler {
             client: DeepSeekClient::new(api_key, None),
             max_rounds: 5,
             plan_cache: None,
+            cached_user_text: None,
         }
     }
 
@@ -130,6 +133,7 @@ impl LLMScheduler {
             let plan_json = serde_json::to_string(&plan).unwrap_or_default();
             log::info!("生成操作计划: id={}", plan.id);
             self.plan_cache = Some(plan);
+            self.cached_user_text = Some(user_text.to_string());
             return Ok(ProcessResult::PendingPlan {
                 plan_json,
                 message: format!("即将创建{}", complexity.1),
@@ -220,23 +224,25 @@ impl LLMScheduler {
     /// 确认计划：执行完整 LLM 工具调用循环
     pub async fn confirm_plan(
         &mut self,
-        user_text: &str,
         history: &[(String, String)],
         engine: &AppEngine,
     ) -> Result<SchedulerResult, String> {
-        self.plan_cache = None; // 清除缓存
-        self.execute_full(user_text, history, engine).await
+        let user_text = self.cached_user_text.take().unwrap_or_default();
+        self.plan_cache = None;
+        self.execute_full(&user_text, history, engine).await
     }
 
     /// 取消计划
     pub fn cancel_plan(&mut self) {
         self.plan_cache = None;
+        self.cached_user_text = None;
         log::info!("操作计划已取消");
     }
 
     /// 修改计划：清除缓存
     pub fn modify_plan(&mut self) {
         self.plan_cache = None;
+        self.cached_user_text = None;
     }
 
     /// 完整执行（原有 LLM 多轮工具调用逻辑）

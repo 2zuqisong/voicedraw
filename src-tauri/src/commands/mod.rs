@@ -132,11 +132,6 @@ pub async fn confirm_plan(app: tauri::AppHandle) -> Result<serde_json::Value, St
         ctx.to_history()
     };
 
-    let user_text = {
-        let ctx = ENGINE.context.lock().unwrap();
-        ctx.last_user_text().unwrap_or_default()
-    };
-
     // take() 模式：取出 scheduler，释放锁，await 后放回
     let mut scheduler = LLM_SCHEDULER
         .lock()
@@ -144,7 +139,10 @@ pub async fn confirm_plan(app: tauri::AppHandle) -> Result<serde_json::Value, St
         .take()
         .ok_or("调度器未初始化")?;
 
-    let result = scheduler.confirm_plan(&user_text, &history, &ENGINE).await;
+    // 在 await 前捕获用户文本（confirm_plan 内部会 take 清空）
+    let plan_user_text = scheduler.cached_user_text.clone().unwrap_or_default();
+
+    let result = scheduler.confirm_plan(&history, &ENGINE).await;
 
     // 放回
     *LLM_SCHEDULER.lock().unwrap() = Some(scheduler);
@@ -158,7 +156,7 @@ pub async fn confirm_plan(app: tauri::AppHandle) -> Result<serde_json::Value, St
             }
             {
                 let mut ctx = ENGINE.context.lock().unwrap();
-                ctx.add_turn(user_text, result.message.clone(), vec![]);
+                ctx.add_turn(plan_user_text, result.message.clone(), vec![]);
             }
             Ok(serde_json::json!({
                 "success": true,
