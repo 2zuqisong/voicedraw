@@ -24,7 +24,12 @@ pub async fn process_command(
                 .unwrap_or_else(|_| "sk-placeholder".into());
 
             let scheduler = llm::scheduler::LLMScheduler::new(api_key);
-            let history: Vec<(String, String)> = vec![]; // TODO: Phase 6 接入对话历史
+
+            // 从对话上下文中获取历史
+            let history = {
+                let ctx = ENGINE.context.lock().unwrap();
+                ctx.to_history()
+            };
 
             match scheduler.process(&cleaned_text, &history, &ENGINE).await {
                 Ok(result) => {
@@ -33,6 +38,17 @@ pub async fn process_command(
                         ENGINE.snapshots.lock().unwrap().save(state.clone());
                         let _ = app.emit("canvas-updated", state);
                     }
+
+                    // 记录本轮对话
+                    {
+                        let mut ctx = ENGINE.context.lock().unwrap();
+                        ctx.add_turn(
+                            cleaned_text.clone(),
+                            result.message.clone(),
+                            vec![], // 新创建的节点 ID 由后续 Phase 增强
+                        );
+                    }
+
                     Ok(serde_json::json!({
                         "success": true,
                         "message": result.message,

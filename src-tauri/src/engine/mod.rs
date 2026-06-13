@@ -15,6 +15,7 @@ use canvas_state::CanvasState;
 pub struct AppEngine {
     pub canvas: Mutex<Option<CanvasState>>,
     pub snapshots: Mutex<snapshot::SnapshotManager>,
+    pub context: Mutex<crate::preprocessor::context_enrich::ConversationContext>,
 }
 
 impl AppEngine {
@@ -32,6 +33,7 @@ impl AppEngine {
         Self {
             canvas: Mutex::new(Some(default_canvas)),
             snapshots: Mutex::new(snapshot::SnapshotManager::new(20)),
+            context: Mutex::new(crate::preprocessor::context_enrich::ConversationContext::new()),
         }
     }
 }
