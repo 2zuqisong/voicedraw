@@ -25,13 +25,24 @@ pub async fn process_command(
 
             let scheduler = llm::scheduler::LLMScheduler::new(api_key);
 
+            // 用对话上下文丰富用户文本（代词消解）
+            let enriched_text = {
+                let ctx = ENGINE.context.lock().unwrap();
+                let canvas = ENGINE.canvas.lock().unwrap();
+                let nodes = canvas.as_ref().map(|c| &c.nodes);
+                match nodes {
+                    Some(n) => ctx.enrich_user_text(&cleaned_text, n),
+                    None => cleaned_text.clone(),
+                }
+            };
+
             // 从对话上下文中获取历史
             let history = {
                 let ctx = ENGINE.context.lock().unwrap();
                 ctx.to_history()
             };
 
-            match scheduler.process(&cleaned_text, &history, &ENGINE).await {
+            match scheduler.process(&enriched_text, &history, &ENGINE).await {
                 Ok(result) => {
                     // 保存快照用于 undo/redo
                     if let Some(ref state) = result.canvas_state {

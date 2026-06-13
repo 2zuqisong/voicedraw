@@ -72,7 +72,7 @@ impl ConversationContext {
         &self,
         text: &str,
         nodes: &HashMap<String, crate::engine::canvas_state::DiagramNode>,
-    ) -> Option<String> {
+    ) -> Option<(String, String)> {
         // 查找模糊引用词
         let ref_words = ["那个", "这个", "它", "上面那个", "刚才那个"];
         let has_ref = ref_words.iter().any(|w| text.contains(w));
@@ -99,14 +99,33 @@ impl ConversationContext {
                         if text.contains(keyword)
                             && format!("{:?}", node.node_type) == *nt
                         {
-                            return Some(node_id.clone());
+                            return Some((node_id.clone(), node.label.clone()));
                         }
                     }
                     // 如果只有代词没有类型，返回上一轮最后一个节点
-                    return Some(node_id.clone());
+                    return Some((node_id.clone(), node.label.clone()));
                 }
             }
         }
         None
+    }
+
+    /// 丰富用户文本：消解代词引用，附加上下文信息
+    /// 例如「把那个菱形改成绿色」→ 「把那个菱形改成绿色
+    /// （注：'那个菱形'指的是节点'判断条件'(id: abc123)）」
+    pub fn enrich_user_text(
+        &self,
+        text: &str,
+        nodes: &HashMap<String, crate::engine::canvas_state::DiagramNode>,
+    ) -> String {
+        match self.resolve_reference(text, nodes) {
+            Some((node_id, label)) => {
+                format!(
+                    "{}\n（上下文：上一轮创建的节点 \"{}\" (id: {})）",
+                    text, label, node_id
+                )
+            }
+            None => text.to_string(),
+        }
     }
 }
