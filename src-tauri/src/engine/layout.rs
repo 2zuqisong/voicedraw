@@ -58,14 +58,15 @@ pub fn top_down_layout(
         }
     }
 
-    // 4. 计算坐标
+    // 4. 计算坐标（居中布置）
     let x_spacing = 200.0;
     let y_spacing = 120.0;
-    let start_y = 60.0;
+    let canvas_center_x = 580.0; // 画布水平中心（适配常见窗口宽度）
+    let start_y = 80.0;
 
     for (layer_idx, layer) in layers.iter().enumerate() {
         let total_width = (layer.len() as f64 - 1.0) * x_spacing;
-        let start_x = 400.0 - total_width / 2.0; // 居中
+        let start_x = canvas_center_x - total_width / 2.0; // 居中
         for (node_idx, node_id) in layer.iter().enumerate() {
             if let Some(node) = nodes.get_mut(node_id) {
                 node.position = Position {
@@ -80,8 +81,8 @@ pub fn top_down_layout(
 fn layout_fallback(nodes: &mut HashMap<String, DiagramNode>) {
     for (i, (_, node)) in nodes.iter_mut().enumerate() {
         node.position = Position {
-            x: 100.0 + (i as f64 % 4.0) * 200.0,
-            y: 60.0 + (i as f64 / 4.0).floor() * 120.0,
+            x: 480.0 + (i as f64 % 4.0) * 200.0,
+            y: 80.0 + (i as f64 / 4.0).floor() * 120.0,
         };
     }
 }
