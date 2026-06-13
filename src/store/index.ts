@@ -178,7 +178,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   _initEventListener: async () => {
     // 监听 Rust 端推送的 canvas 更新事件
     await listen<CanvasState>("canvas-updated", (event) => {
-      set({ canvasState: event.payload, status: "idle" });
+      set({ canvasState: event.payload, status: "idle", pendingPlan: null });
     });
   },
 }));

@@ -3,11 +3,14 @@ import { useAppStore } from "../../store";
 
 export default function OperationPreview() {
   const pendingPlan = useAppStore((s) => s.pendingPlan);
+  const status = useAppStore((s) => s.status);
   const confirmPlan = useAppStore((s) => s.confirmPlan);
   const cancelPlan = useAppStore((s) => s.cancelPlan);
   const modifyPlan = useAppStore((s) => s.modifyPlan);
   const [editText, setEditText] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+
+  const isExecuting = status === "executing";
 
   if (!pendingPlan) return null;
 
@@ -158,31 +161,33 @@ export default function OperationPreview() {
         >
           <button
             onClick={confirmPlan}
+            disabled={isExecuting}
             style={{
               flex: 1,
               height: 36,
               borderRadius: 20,
               border: "none",
-              background: "#34a853",
+              background: isExecuting ? "#a0d4aa" : "#34a853",
               color: "#fff",
               fontSize: 14,
               fontWeight: 500,
-              cursor: "pointer",
+              cursor: isExecuting ? "default" : "pointer",
             }}
           >
-            ✓ 确认执行
+            {isExecuting ? "⏳ 执行中..." : "✓ 确认执行"}
           </button>
           <button
             onClick={cancelPlan}
+            disabled={isExecuting}
             style={{
               width: 72,
               height: 36,
               borderRadius: 20,
               border: "1px solid #e8eaed",
               background: "#fff",
-              color: "#ea4335",
+              color: isExecuting ? "#ccc" : "#ea4335",
               fontSize: 13,
-              cursor: "pointer",
+              cursor: isExecuting ? "default" : "pointer",
             }}
           >
             ✕ 取消
@@ -192,15 +197,16 @@ export default function OperationPreview() {
               setEditText("");
               setIsEditing(true);
             }}
+            disabled={isExecuting}
             style={{
               width: 72,
               height: 36,
               borderRadius: 20,
               border: "1px solid #e8eaed",
               background: "#fff",
-              color: "#5f6368",
+              color: isExecuting ? "#ccc" : "#5f6368",
               fontSize: 13,
-              cursor: "pointer",
+              cursor: isExecuting ? "default" : "pointer",
             }}
           >
             ✎ 修改
