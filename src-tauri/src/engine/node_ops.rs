@@ -11,7 +11,7 @@ pub fn add_node(
     style: Option<NodeStyle>,
 ) -> DiagramNode {
     let id = Uuid::new_v4().to_string();
-    let pos = position.unwrap_or(Position { x: 100.0, y: 100.0 });
+    let pos = position.unwrap_or(Position { x: 740.0, y: 424.0 });
     let node = DiagramNode {
         id: id.clone(),
         node_type,

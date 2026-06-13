@@ -58,14 +58,15 @@ pub fn top_down_layout(
         }
     }
 
-    // 4. 计算坐标
+    // 4. 计算坐标（居中布置）
     let x_spacing = 200.0;
     let y_spacing = 120.0;
-    let start_y = 60.0;
+    let canvas_center_x = 580.0; // 画布水平中心（适配常见窗口宽度）
+    let start_y = 80.0;
 
     for (layer_idx, layer) in layers.iter().enumerate() {
         let total_width = (layer.len() as f64 - 1.0) * x_spacing;
-        let start_x = 400.0 - total_width / 2.0; // 居中
+        let start_x = canvas_center_x - total_width / 2.0; // 居中
         for (node_idx, node_id) in layer.iter().enumerate() {
             if let Some(node) = nodes.get_mut(node_id) {
                 node.position = Position {
@@ -80,8 +81,8 @@ pub fn top_down_layout(
 fn layout_fallback(nodes: &mut HashMap<String, DiagramNode>) {
     for (i, (_, node)) in nodes.iter_mut().enumerate() {
         node.position = Position {
-            x: 100.0 + (i as f64 % 4.0) * 200.0,
-            y: 60.0 + (i as f64 / 4.0).floor() * 120.0,
+            x: 480.0 + (i as f64 % 4.0) * 200.0,
+            y: 80.0 + (i as f64 / 4.0).floor() * 120.0,
         };
     }
 }
@@ -96,6 +97,17 @@ pub fn left_right_layout(
     // 交换 x 和 y
     for node in nodes.values_mut() {
         std::mem::swap(&mut node.position.x, &mut node.position.y);
+    }
+    // 交换后 x 值来自原 y，需要重新居中
+    if nodes.is_empty() {
+        return;
+    }
+    let min_x = nodes.values().map(|n| n.position.x).fold(f64::INFINITY, f64::min);
+    let max_x = nodes.values().map(|n| n.position.x + n.size.width).fold(f64::NEG_INFINITY, f64::max);
+    let layout_width = max_x - min_x;
+    let offset_x = 580.0 - (min_x + layout_width / 2.0);
+    for node in nodes.values_mut() {
+        node.position.x += offset_x;
     }
 }
 
