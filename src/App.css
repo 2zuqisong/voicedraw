@@ -1,8 +1,25 @@
 :root {
-  --bg-color: #f7f8fc;
-  --panel-color: #ffffff;
-  --text-color: #1f2328;
-  --border-color: #e5e7eb;
+  /* Base — warm off-white / near-black */
+  --bg: #fafaf8;
+  --surface: #ffffff;
+  --text-primary: #141414;
+  --text-secondary: #6b6b6b;
+  --text-tertiary: #b0b0b0;
+  --border: #e2e2de;
+  --border-light: #efefeb;
+
+  /* Accent — single warm amber, no other chromatic colors */
+  --accent: #e8960a;
+  --accent-dim: rgba(232, 150, 10, 0.10);
+  --accent-glow: rgba(232, 150, 10, 0.22);
+
+  /* Typography */
+  --font-mono: "DM Mono", "JetBrains Mono", "Cascadia Code", monospace;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+
+  /* Shape — brutalist: no radius, no shadow */
+  --radius: 0px;
+  --radius-panel: 2px;
 }
 
 /* Reset */
@@ -12,21 +29,87 @@
   box-sizing: border-box;
 }
 
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* App root */
 .app-container {
   display: flex;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+}
 
-  width: 100vw;
-  height: 100vh;
+/* Shared panel style — single source of truth for all floating panels */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
 
-  overflow: hidden;
+/* Shared button reset */
+.btn-ghost {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 400;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.btn-ghost:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+  background: var(--border-light);
+}
+.btn-ghost:disabled {
+  color: var(--text-tertiary);
+  border-color: var(--border-light);
+  cursor: default;
+}
 
-  background-color: var(--bg-color);
-  color: var(--text-color);
+.btn-accent {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.btn-accent:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.btn-accent:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
 
-  font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+/* Fade-in animation — used once, subtle */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Pulse — for status indicators */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }

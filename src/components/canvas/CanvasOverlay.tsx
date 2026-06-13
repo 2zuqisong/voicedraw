@@ -12,15 +12,18 @@ export default function CanvasOverlay() {
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
-        background: "rgba(0,0,0,0.6)",
-        color: "#fff",
-        padding: "16px 32px",
-        borderRadius: 12,
-        fontSize: 15,
         zIndex: 100,
+        fontFamily: "var(--font-mono)",
+        fontSize: 18,
+        fontWeight: 300,
+        color: "var(--text-tertiary)",
+        letterSpacing: "0.04em",
+        animation: "pulse 1.8s ease-in-out infinite",
+        userSelect: "none",
+        pointerEvents: "none",
       }}
     >
-      🤔 正在理解指令...
+      thinking…
     </div>
   );
 }
