@@ -16,14 +16,14 @@ export default function TopBar() {
     <div
       style={{
         position: "absolute",
-        top: 12,
-        left: 16,
+        top: 16,
+        left: 20,
         zIndex: 80,
         display: "flex",
         alignItems: "center",
-        gap: 10,
+        gap: 12,
         fontFamily: "var(--font-mono)",
-        fontSize: 12,
+        fontSize: 16,
         fontWeight: 300,
         letterSpacing: "0.02em",
         color: "var(--text-secondary)",
@@ -42,7 +42,7 @@ export default function TopBar() {
         <span style={{
           color: "var(--accent)",
           animation: "pulse 1.5s ease-in-out infinite",
-          fontSize: 11,
+          fontSize: 14,
         }}>
           {STATUS_LABEL[status] || ""}
         </span>

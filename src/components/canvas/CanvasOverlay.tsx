@@ -14,7 +14,7 @@ export default function CanvasOverlay() {
         transform: "translate(-50%, -50%)",
         zIndex: 100,
         fontFamily: "var(--font-mono)",
-        fontSize: 13,
+        fontSize: 18,
         fontWeight: 300,
         color: "var(--text-tertiary)",
         letterSpacing: "0.04em",

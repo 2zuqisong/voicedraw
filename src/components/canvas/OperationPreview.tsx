@@ -27,22 +27,22 @@ export default function OperationPreview() {
     <div
       style={{
         position: "absolute",
-        top: 48,
+        top: 60,
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 200,
         background: "var(--surface)",
         border: "1px solid var(--border)",
         borderRadius: "var(--radius-panel)",
-        padding: "16px 20px 14px",
-        minWidth: 380,
-        maxWidth: 500,
+        padding: "20px 24px 18px",
+        minWidth: 500,
+        maxWidth: 640,
         fontFamily: "var(--font-mono)",
-        fontSize: 11,
+        fontSize: 14,
         fontWeight: 300,
         color: "var(--text-secondary)",
         letterSpacing: "0.01em",
-        lineHeight: 1.7,
+        lineHeight: 1.8,
       }}
     >
       {/* Header */}
@@ -50,8 +50,8 @@ export default function OperationPreview() {
         style={{
           fontWeight: 500,
           color: "var(--text-primary)",
-          marginBottom: 10,
-          fontSize: 12,
+          marginBottom: 14,
+          fontSize: 16,
           letterSpacing: "0.03em",
         }}
       >
@@ -59,7 +59,7 @@ export default function OperationPreview() {
       </div>
 
       {/* Details */}
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ marginBottom: 16 }}>
         <div>
           <span style={{ color: "var(--text-tertiary)" }}>type </span>
           {pendingPlan.diagram_type || "flowchart"}
@@ -88,7 +88,7 @@ export default function OperationPreview() {
 
       {/* Actions */}
       {isEditing ? (
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 10 }}>
           <input
             type="text"
             value={editText}
@@ -108,12 +108,12 @@ export default function OperationPreview() {
             autoFocus
             style={{
               flex: 1,
-              height: 28,
+              height: 38,
               border: "1px solid var(--accent)",
               borderRadius: "var(--radius)",
-              padding: "0 8px",
+              padding: "0 12px",
               fontFamily: "var(--font-mono)",
-              fontSize: 11,
+              fontSize: 14,
               fontWeight: 300,
               outline: "none",
               background: "var(--surface)",
@@ -127,18 +127,18 @@ export default function OperationPreview() {
               setIsEditing(false);
             }}
             className="btn-accent"
-            style={{ padding: "0 12px", height: 28 }}
+            style={{ padding: "0 18px", height: 38, fontSize: 14 }}
           >
             update
           </button>
         </div>
       ) : (
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 10 }}>
           <button
             onClick={confirmPlan}
             disabled={isExecuting}
             className="btn-accent"
-            style={{ flex: 1, height: 28 }}
+            style={{ flex: 1, height: 38, fontSize: 14 }}
           >
             {isExecuting ? "running…" : "confirm"}
           </button>
@@ -146,7 +146,7 @@ export default function OperationPreview() {
             onClick={cancelPlan}
             disabled={isExecuting}
             className="btn-ghost"
-            style={{ padding: "0 14px", height: 28 }}
+            style={{ padding: "0 20px", height: 38, fontSize: 14 }}
           >
             cancel
           </button>
@@ -157,7 +157,7 @@ export default function OperationPreview() {
             }}
             disabled={isExecuting}
             className="btn-ghost"
-            style={{ padding: "0 8px", height: 28, width: 28 }}
+            style={{ padding: "0 10px", height: 38, width: 38, fontSize: 16 }}
           >
             ✎
           </button>

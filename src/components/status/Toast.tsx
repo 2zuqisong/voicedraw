@@ -19,7 +19,7 @@ export default function Toast() {
   if (!visible) return null;
 
   const prefix =
-    status === "error" ? "err:" : status === "executing" ? "ok:" : "";
+    status === "error" ? "err " : status === "executing" ? "ok " : "";
 
   return (
     <div
@@ -30,16 +30,16 @@ export default function Toast() {
         transform: "translateX(-50%)",
         zIndex: 1000,
         fontFamily: "var(--font-mono)",
-        fontSize: 11,
+        fontSize: 14,
         fontWeight: 300,
         letterSpacing: "0.02em",
         color: status === "error" ? "var(--text-primary)" : "var(--text-secondary)",
         background: "var(--surface)",
         border: `1px solid ${status === "error" ? "var(--text-primary)" : "var(--border)"}`,
         borderRadius: "var(--radius)",
-        padding: "4px 12px",
+        padding: "8px 18px",
         animation: "fadeIn 0.2s ease",
-        maxWidth: 480,
+        maxWidth: 580,
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
