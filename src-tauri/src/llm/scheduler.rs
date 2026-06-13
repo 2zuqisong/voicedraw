@@ -12,6 +12,21 @@ use super::tool_defs::get_tool_definitions;
 use crate::engine::grid::GridConfig;
 use crate::engine::AppEngine;
 
+/// 从 LLM 响应中提取 JSON：处理 markdown 代码块包裹的情况
+fn extract_json_from_response(content: &str) -> &str {
+    let trimmed = content.trim();
+    // 去掉 ```json ... ``` 或 ``` ... ``` 包裹
+    if let Some(inner) = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+    {
+        if let Some(json) = inner.strip_suffix("```") {
+            return json.trim();
+        }
+    }
+    trimmed
+}
+
 /// 操作计划（用于预览确认）
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct OperationPlan {
@@ -143,9 +158,10 @@ impl LLMScheduler {
 
         let response = self.client.chat(messages, vec![], false).await?;
         let content = response.content.unwrap_or_default();
+        let json_text = extract_json_from_response(&content);
 
         // 解析 JSON 响应
-        let v: serde_json::Value = serde_json::from_str(&content)
+        let v: serde_json::Value = serde_json::from_str(json_text)
             .map_err(|e| format!("复杂度判断 JSON 解析失败: {} | raw={}", e, content))?;
 
         Ok((
@@ -195,7 +211,8 @@ impl LLMScheduler {
 
         let response = self.client.chat(messages, vec![], false).await?;
         let content = response.content.unwrap_or_default();
-        let nodes: Vec<PlanNode> = serde_json::from_str(&content)
+        let json_text = extract_json_from_response(&content);
+        let nodes: Vec<PlanNode> = serde_json::from_str(json_text)
             .map_err(|e| format!("节点提取 JSON 解析失败: {} | raw={}", e, content))?;
         Ok(nodes)
     }
