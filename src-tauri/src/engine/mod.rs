@@ -4,6 +4,7 @@ pub mod edge_ops;
 pub mod layout;
 pub mod style_ops;
 pub mod snapshot;
+pub mod grid;
 
 pub use canvas_state::*;
 
