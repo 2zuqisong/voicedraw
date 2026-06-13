@@ -33,6 +33,15 @@ impl DeepSeekClient {
         tools: Vec<ChatCompletionTool>,
         stream: bool,
     ) -> Result<ChatCompletionResponse, String> {
+        let msg_count = messages.len();
+        let tool_count = tools.len();
+        log::info!(
+            "DeepSeek API 请求: {} 条消息, {} 个工具, model={}",
+            msg_count,
+            tool_count,
+            self.model
+        );
+
         let request = CreateChatCompletionRequest {
             model: self.model.clone(),
             messages,
@@ -50,16 +59,30 @@ impl DeepSeekClient {
             .chat()
             .create(request)
             .await
-            .map_err(|e| format!("DeepSeek API 调用失败: {}", e))?;
+            .map_err(|e| {
+                log::error!("DeepSeek API 调用失败: {}", e);
+                format!("DeepSeek API 调用失败: {}", e)
+            })?;
 
         // 解析返回内容
         let choice = response
             .choices
             .into_iter()
             .next()
-            .ok_or("DeepSeek 返回空响应".to_string())?;
+            .ok_or_else(|| {
+                log::error!("DeepSeek 返回空响应");
+                "DeepSeek 返回空响应".to_string()
+            })?;
 
         let message = choice.message;
+        let has_tool_calls = message.tool_calls.is_some();
+        let has_content = message.content.is_some();
+
+        log::info!(
+            "DeepSeek 响应: content={}, tool_calls={}",
+            has_content,
+            has_tool_calls
+        );
 
         Ok(ChatCompletionResponse {
             content: message.content,
