@@ -3,14 +3,6 @@ import { useAppStore } from "../../store";
 import { useVoiceRecognition } from "../../hooks/useVoiceRecognition";
 import WaveformVisualizer from "../voice/WaveformVisualizer";
 
-const STATUS_TEXT: Record<string, string> = {
-  idle: "点击麦克风开始语音指令",
-  listening: "正在聆听...",
-  thinking: "🤔 正在理解...",
-  executing: "✏️ 正在绘图...",
-  error: "❌ 出错了，点击重试",
-};
-
 export default function VoiceBar() {
   const isListening = useAppStore((s) => s.isListening);
   const transcript = useAppStore((s) => s.transcript);
@@ -34,9 +26,7 @@ export default function VoiceBar() {
     setTimeout(() => setStatus("idle"), 2000);
   }, [setStatus]);
 
-  const handleEnd = useCallback(() => {
-    // recognition 自然结束
-  }, []);
+  const handleEnd = useCallback(() => {}, []);
 
   const { start, stop, abort, isSupported } = useVoiceRecognition({
     onResult: handleResult,
@@ -44,7 +34,6 @@ export default function VoiceBar() {
     onEnd: handleEnd,
   });
 
-  // 开始录音
   const handleStart = () => {
     if (status !== "idle") return;
     setTranscript("");
@@ -52,24 +41,19 @@ export default function VoiceBar() {
     start();
   };
 
-  // 确认提交（语音）
   const handleConfirm = () => {
     stop();
     useAppStore.setState({ isListening: false });
     const text = lastTextRef.current.trim();
-    if (text.length > 0) {
-      submitCommand(text);
-    }
+    if (text.length > 0) submitCommand(text);
   };
 
-  // 取消录音
   const handleCancel = () => {
     abort();
     setTranscript("");
     useAppStore.setState({ isListening: false, status: "idle" });
   };
 
-  // 提交文本（fallback 模式）
   const handleTextSubmit = () => {
     const text = draftText.trim();
     if (text.length === 0 || status !== "idle") return;
@@ -77,223 +61,172 @@ export default function VoiceBar() {
     submitCommand(text);
   };
 
-  // 键盘回车提交
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleTextSubmit();
-    }
+    if (e.key === "Enter") handleTextSubmit();
   };
 
   const isBusy = status !== "idle" && status !== "listening";
 
   return (
-    <footer className="voice-bar" style={{
-      position: "absolute",
-      bottom: 16,
-      left: "50%",
-      transform: "translateX(-50%)",
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "8px 14px",
-      background: "#ffffff",
-      borderRadius: 40,
-      boxShadow: "0 2px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
-      border: "1px solid #e8eaed",
-      zIndex: 100,
-      minWidth: 560,
-      userSelect: "none",
-    }}>
-      {/* 波形可视化 */}
-      <WaveformVisualizer isActive={isListening} />
+    <div
+      style={{
+        position: "absolute",
+        bottom: 20,
+        left: "50%",
+        transform: "translateX(-50%)",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        zIndex: 100,
+        userSelect: "none",
+      }}
+    >
+      {/* Undo — subtle, edge-mounted on left */}
+      <div style={{ display: "flex", gap: 4 }}>
+        <button
+          onClick={() => quickAction("undo")}
+          disabled={status !== "idle"}
+          className="btn-ghost"
+          style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+          title="撤销"
+        >
+          ↺
+        </button>
+        <button
+          onClick={() => quickAction("redo")}
+          disabled={status !== "idle"}
+          className="btn-ghost"
+          style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+          title="重做"
+        >
+          ↻
+        </button>
+      </div>
 
-      {isSupported ? (
-        <>
-          {/* 取消按钮 — 仅在录音中显示 */}
-          {isListening && (
-            <button
-              onClick={handleCancel}
+      {/* Main interaction pill */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "var(--surface)",
+          border: isListening ? "1px solid var(--accent)" : "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          padding: "4px 6px 4px 12px",
+          minWidth: 420,
+          transition: "border-color 0.15s",
+        }}
+      >
+        {/* Waveform — slim, monochrome */}
+        <WaveformVisualizer isActive={isListening} barCount={16} />
+
+        {isSupported ? (
+          <>
+            {/* Cancel */}
+            {isListening && (
+              <button
+                onClick={handleCancel}
+                className="btn-ghost"
+                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}
+                title="取消"
+              >
+                ✕
+              </button>
+            )}
+
+            {/* Transcript / prompt area */}
+            <div
+              onClick={isListening ? undefined : handleStart}
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
-                border: "none",
-                background: "#ea4335",
-                color: "#fff",
-                fontSize: 18,
-                cursor: "pointer",
+                flex: 1,
+                height: 28,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                flexShrink: 0,
-                transition: "all 0.2s",
+                cursor: isBusy ? "default" : "pointer",
+                padding: "0 8px",
+                overflow: "hidden",
+                background: isListening ? "var(--accent-dim)" : "transparent",
+                borderRadius: "var(--radius)",
+                transition: "background 0.15s",
               }}
-              title="取消"
             >
-              ✕
-            </button>
-          )}
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12,
+                  fontWeight: 300,
+                  color: isListening ? "var(--accent)" : "var(--text-tertiary)",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                  overflow: "hidden",
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {isListening
+                  ? (transcript || "…")
+                  : status === "idle"
+                    ? "click to speak"
+                    : status === "thinking"
+                      ? "thinking…"
+                      : status === "executing"
+                        ? "drawing…"
+                        : "error"}
+              </span>
+            </div>
 
-          {/* 语音输入区域 */}
-          <div
-            onClick={isListening ? undefined : handleStart}
-            style={{
-              flex: 1,
-              height: 36,
-              borderRadius: 20,
-              background: isListening
-                ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                : "#f1f3f4",
-              border: isListening ? "2px solid #667eea" : "2px solid transparent",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: isBusy ? "default" : "pointer",
-              transition: "all 0.2s",
-              padding: "0 14px",
-              overflow: "hidden",
-            }}
-          >
-            <span style={{
-              color: isListening ? "#fff" : "#9aa0a6",
-              fontSize: 13,
-              whiteSpace: "nowrap",
-              textOverflow: "ellipsis",
-              overflow: "hidden",
-            }}>
-              {isListening
-                ? (transcript || "正在听...")
-                : STATUS_TEXT[status] || STATUS_TEXT.idle}
+            {/* Confirm */}
+            {isListening && (
+              <button
+                onClick={handleConfirm}
+                disabled={transcript.trim().length === 0}
+                className={transcript.trim().length > 0 ? "btn-accent" : "btn-ghost"}
+                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}
+                title="确认"
+              >
+                ✓
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Text fallback */}
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}>
+              ⌨
             </span>
-          </div>
-
-          {/* 确认按钮 — 仅在录音中且有内容时显示 */}
-          {isListening && (
-            <button
-              onClick={handleConfirm}
+            <input
+              type="text"
+              value={draftText}
+              onChange={(e) => setDraftText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="type then enter…"
+              disabled={status !== "idle"}
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: "50%",
+                flex: 1,
+                height: 28,
                 border: "none",
-                background: transcript.trim().length > 0 ? "#34a853" : "#dadce0",
-                color: transcript.trim().length > 0 ? "#fff" : "#9aa0a6",
-                fontSize: 18,
-                cursor: transcript.trim().length > 0 ? "pointer" : "default",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-                transition: "all 0.2s",
+                background: "transparent",
+                padding: "0 6px",
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                fontWeight: 300,
+                outline: "none",
+                color: "var(--text-primary)",
+                borderRadius: 0,
               }}
-              title="确认"
+            />
+            <button
+              onClick={handleTextSubmit}
+              disabled={draftText.trim().length === 0 || status !== "idle"}
+              className={draftText.trim().length > 0 && status === "idle" ? "btn-accent" : "btn-ghost"}
+              style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}
+              title="发送"
             >
-              ✓
+              →
             </button>
-          )}
-
-          {/* 字数统计 */}
-          <span style={{
-            fontSize: 11,
-            color: "#9aa0a6",
-            minWidth: 36,
-            textAlign: "right",
-            flexShrink: 0,
-          }}>
-            {transcript.length > 0 ? `${transcript.length} 字` : ""}
-          </span>
-        </>
-      ) : (
-        <>
-          {/* Fallback: 文本输入框 */}
-          <span style={{
-            fontSize: 12,
-            color: "#9aa0a6",
-            flexShrink: 0,
-          }}>
-            ⌨
-          </span>
-          <input
-            type="text"
-            value={draftText}
-            onChange={(e) => setDraftText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="输入指令后按回车或点发送..."
-            disabled={status !== "idle"}
-            style={{
-              flex: 1,
-              height: 36,
-              borderRadius: 20,
-              border: "1px solid #e8eaed",
-              background: status !== "idle" ? "#f5f5f5" : "#fff",
-              padding: "0 14px",
-              fontSize: 13,
-              outline: "none",
-              color: "#202124",
-            }}
-          />
-          <button
-            onClick={handleTextSubmit}
-            disabled={draftText.trim().length === 0 || status !== "idle"}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              border: "none",
-              background: draftText.trim().length > 0 && status === "idle" ? "#1a73e8" : "#dadce0",
-              color: draftText.trim().length > 0 && status === "idle" ? "#fff" : "#9aa0a6",
-              fontSize: 16,
-              cursor: draftText.trim().length > 0 && status === "idle" ? "pointer" : "default",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              transition: "all 0.2s",
-            }}
-            title="发送"
-          >
-            →
-          </button>
-        </>
-      )}
-
-      {/* 撤销 / 重做 */}
-      <button
-        onClick={() => quickAction("undo")}
-        disabled={status !== "idle"}
-        style={{
-          padding: "6px 14px",
-          borderRadius: 20,
-          border: "1px solid #e8eaed",
-          background: "#fff",
-          color: status !== "idle" ? "#ccc" : "#5f6368",
-          cursor: status !== "idle" ? "default" : "pointer",
-          fontSize: 12,
-          fontWeight: 500,
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-        }}
-      >
-        ↩ 撤销
-      </button>
-      <button
-        onClick={() => quickAction("redo")}
-        disabled={status !== "idle"}
-        style={{
-          padding: "6px 14px",
-          borderRadius: 20,
-          border: "1px solid #e8eaed",
-          background: "#fff",
-          color: status !== "idle" ? "#ccc" : "#5f6368",
-          cursor: status !== "idle" ? "default" : "pointer",
-          fontSize: 12,
-          fontWeight: 500,
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-        }}
-      >
-        ↪ 重做
-      </button>
-    </footer>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

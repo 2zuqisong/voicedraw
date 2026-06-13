@@ -73,8 +73,8 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
 
       if (gx >= 0 && gy >= 0) {
         tip.style.display = "block";
-        tip.style.left = `${opt.e.clientX + 14}px`;
-        tip.style.top = `${opt.e.clientY - 28}px`;
+        tip.style.left = `${(opt.e as MouseEvent).clientX + 14}px`;
+        tip.style.top = `${(opt.e as MouseEvent).clientY - 28}px`;
         tip.textContent = `x:${gx}, y:${gy}`;
       } else {
         tip.style.display = "none";
@@ -124,85 +124,56 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
           display: "none",
           position: "fixed",
           pointerEvents: "none",
-          backgroundColor: "rgba(30, 30, 30, 0.82)",
-          color: "#f0f0f0",
-          fontSize: 12,
-          fontFamily: "monospace",
-          padding: "3px 7px",
-          borderRadius: 4,
+          background: "var(--surface, #fff)",
+          color: "var(--text-primary, #141414)",
+          fontSize: 11,
+          fontFamily: "var(--font-mono, monospace)",
+          fontWeight: 300,
+          padding: "2px 6px",
+          border: "1px solid var(--border, #e2e2de)",
+          borderRadius: "var(--radius, 0)",
           whiteSpace: "nowrap",
           zIndex: 9999,
-          lineHeight: 1.4,
+          lineHeight: 1.6,
+          letterSpacing: "0.02em",
         }}
       />
     </div>
   );
 }
 
-/** 渲染坐标网格背景（使用实际像素尺寸，不依赖 CanvasState） */
+/** 渲染坐标网格背景 — dot grid 极简风格 */
 function renderGrid(
   canvas: fabric.Canvas,
   width: number,
   height: number,
 ): void {
   const { grid_size, grid_origin_x, grid_origin_y } = DEFAULT_GRID;
-
-  const lines: fabric.Line[] = [];
-
-  // 细线（每格一条，淡红）
-  for (let x = grid_origin_x; x <= width; x += grid_size) {
-    const line = new fabric.Line([x, 0, x, height], {
-      stroke: "#f4cccc",
-      strokeWidth: 0.5,
-      selectable: false,
-      evented: false,
-      excludeFromExport: true,
-    });
-    (line as any).isGridLine = true;
-    lines.push(line);
-  }
-  for (let y = grid_origin_y; y <= height; y += grid_size) {
-    const line = new fabric.Line([0, y, width, y], {
-      stroke: "#f4cccc",
-      strokeWidth: 0.5,
-      selectable: false,
-      evented: false,
-      excludeFromExport: true,
-    });
-    (line as any).isGridLine = true;
-    lines.push(line);
-  }
-
-  // 粗线（每 5 格一条，稍深）
   const majorStep = grid_size * 5;
+
+  const dots: fabric.Circle[] = [];
+
+  // 仅在 5 格交点处放置圆点（极简参考点）
   for (let x = grid_origin_x; x <= width; x += majorStep) {
-    const line = new fabric.Line([x, 0, x, height], {
-      stroke: "#e8b0b0",
-      strokeWidth: 0.8,
-      selectable: false,
-      evented: false,
-      excludeFromExport: true,
-    });
-    (line as any).isGridLine = true;
-    lines.push(line);
-  }
-  for (let y = grid_origin_y; y <= height; y += majorStep) {
-    const line = new fabric.Line([0, y, width, y], {
-      stroke: "#e8b0b0",
-      strokeWidth: 0.8,
-      selectable: false,
-      evented: false,
-      excludeFromExport: true,
-    });
-    (line as any).isGridLine = true;
-    lines.push(line);
+    for (let y = grid_origin_y; y <= height; y += majorStep) {
+      const dot = new fabric.Circle({
+        left: x,
+        top: y,
+        radius: 1.6,
+        fill: "#d4d4ce",
+        selectable: false,
+        evented: false,
+        excludeFromExport: true,
+      });
+      (dot as any).isGridLine = true;
+      dots.push(dot);
+    }
   }
 
-  // 批量添加到画布
   const prevRenderOnAddRemove = canvas.renderOnAddRemove;
   canvas.renderOnAddRemove = false;
-  for (const line of lines) {
-    canvas.add(line);
+  for (const dot of dots) {
+    canvas.add(dot);
   }
   canvas.renderOnAddRemove = prevRenderOnAddRemove;
   canvas.requestRenderAll();
@@ -223,7 +194,7 @@ function renderCanvasState(
   toRemove.forEach((obj) => canvas.remove(obj));
 
   canvas.backgroundColor =
-    state.theme === "Dark" ? "#263238" : "#fafafa";
+    state.theme === "Dark" ? "#1c1c18" : "#fafaf8";
 
   // 渲染连线
   for (const edge of Object.values(state.edges)) {
@@ -315,7 +286,7 @@ function renderNode(
     top: position.y + size.height / 2,
     fontSize: style.font_size,
     fontFamily: style.font_family,
-    fill: "#333",
+    fill: "#1a1a1a",
     originX: "center",
     originY: "center",
     textAlign: "center",

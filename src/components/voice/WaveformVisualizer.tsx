@@ -5,17 +5,20 @@ interface WaveformVisualizerProps {
   barCount?: number;
 }
 
-export default function WaveformVisualizer({ isActive, barCount = 20 }: WaveformVisualizerProps) {
+export default function WaveformVisualizer({ isActive, barCount = 16 }: WaveformVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
 
   useEffect(() => {
     if (!isActive) {
       cancelAnimationFrame(animationRef.current);
-      // 清空画布
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx && canvasRef.current) {
         ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        // Draw a flat idle line
+        const c = canvasRef.current;
+        ctx.fillStyle = "var(--border, #e2e2de)";
+        ctx.fillRect(0, c.height / 2 - 1, c.width, 2);
       }
       return;
     }
@@ -26,20 +29,21 @@ export default function WaveformVisualizer({ isActive, barCount = 20 }: Waveform
     if (!ctx) return;
 
     const animate = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const barWidth = canvas.width / barCount;
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const barWidth = w / barCount;
+
       for (let i = 0; i < barCount; i++) {
-        // 模拟随机音量（正式版接入 Web Audio API analyser）
-        const height = isActive
-          ? Math.random() * canvas.height * 0.8 + canvas.height * 0.1
-          : 3;
-        ctx.fillStyle = `hsl(${220 + i * 3}, 80%, ${50 + height * 0.5}%)`;
-        ctx.fillRect(
-          i * barWidth + 1,
-          canvas.height - height,
-          barWidth - 2,
-          height
-        );
+        const barH = Math.random() * h * 0.7 + h * 0.15;
+        const x = i * barWidth + 1;
+        const y = (h - barH) / 2;
+
+        // Monochrome: only accent color with varying opacity
+        const alpha = 0.25 + (barH / h) * 0.55;
+        ctx.fillStyle = `rgba(232, 150, 10, ${alpha.toFixed(2)})`;
+        ctx.fillRect(x, y, barWidth - 2, barH);
       }
       animationRef.current = requestAnimationFrame(animate);
     };
@@ -51,9 +55,9 @@ export default function WaveformVisualizer({ isActive, barCount = 20 }: Waveform
   return (
     <canvas
       ref={canvasRef}
-      width={200}
-      height={30}
-      style={{ borderRadius: 4, flexShrink: 0 }}
+      width={120}
+      height={24}
+      style={{ flexShrink: 0, display: "block" }}
     />
   );
 }
