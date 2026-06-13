@@ -98,6 +98,17 @@ pub fn left_right_layout(
     for node in nodes.values_mut() {
         std::mem::swap(&mut node.position.x, &mut node.position.y);
     }
+    // 交换后 x 值来自原 y，需要重新居中
+    if nodes.is_empty() {
+        return;
+    }
+    let min_x = nodes.values().map(|n| n.position.x).fold(f64::INFINITY, f64::min);
+    let max_x = nodes.values().map(|n| n.position.x + n.size.width).fold(f64::NEG_INFINITY, f64::max);
+    let layout_width = max_x - min_x;
+    let offset_x = 580.0 - (min_x + layout_width / 2.0);
+    for node in nodes.values_mut() {
+        node.position.x += offset_x;
+    }
 }
 
 /// 布局入口
