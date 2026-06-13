@@ -68,7 +68,25 @@ impl LLMScheduler {
             }
         }
 
-        // 3. 当前 canvas 状态摘要（作为上下文注入）
+        // 3. 对话历史摘要
+        let conv_summary = if history.is_empty() {
+            "（无历史对话）".into()
+        } else {
+            history
+                .iter()
+                .enumerate()
+                .filter_map(|(_i, (role, content))| {
+                    if role == "user" {
+                        Some(format!("用户: {}", content))
+                    } else {
+                        Some(format!("助手: {}", content))
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+
+        // 4. 当前 canvas 状态摘要（作为上下文注入）
         let canvas_summary = {
             let canvas = engine.canvas.lock().unwrap();
             canvas.as_ref().map(|c| {
@@ -83,7 +101,8 @@ impl LLMScheduler {
         };
 
         let user_msg = format!(
-            "用户指令: {}\n{}",
+            "对话历史:\n{}\n\n用户指令: {}\n{}",
+            conv_summary,
             user_text,
             if canvas_summary.is_empty() {
                 "画布为空".into()
@@ -100,12 +119,12 @@ impl LLMScheduler {
                 .into(),
         );
 
-        // 4. 工具定义
+        // 5. 工具定义
         let tools = get_tool_definitions();
 
         let mut final_content = String::new();
 
-        // 5. 多轮循环（最多 max_rounds 轮）
+        // 6. 多轮循环（最多 max_rounds 轮）
         for round in 0..self.max_rounds {
             let response = self
                 .client
