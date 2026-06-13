@@ -18,6 +18,7 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   // 初始化 Fabric.js + 渲染网格 + 自适应窗口
   useEffect(() => {
@@ -60,6 +61,31 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
     });
 
     observer.observe(containerRef.current);
+
+    // 鼠标移动时显示网格坐标 tooltip
+    canvas.on("mouse:move", (opt) => {
+      const tip = tooltipRef.current;
+      if (!tip) return;
+
+      const pointer = canvas.getScenePoint(opt.e);
+      const gx = Math.round((pointer.x - DEFAULT_GRID.grid_origin_x) / DEFAULT_GRID.grid_size);
+      const gy = Math.round((pointer.y - DEFAULT_GRID.grid_origin_y) / DEFAULT_GRID.grid_size);
+
+      if (gx >= 0 && gy >= 0) {
+        tip.style.display = "block";
+        tip.style.left = `${opt.e.clientX + 14}px`;
+        tip.style.top = `${opt.e.clientY - 28}px`;
+        tip.textContent = `x:${gx}, y:${gy}`;
+      } else {
+        tip.style.display = "none";
+      }
+    });
+
+    canvas.on("mouse:out", () => {
+      const tip = tooltipRef.current;
+      if (tip) tip.style.display = "none";
+    });
+
     return () => {
       observer.disconnect();
       cleanup();
@@ -92,6 +118,23 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
       style={{ flex: 1, overflow: "hidden", position: "relative" }}
     >
       <canvas ref={canvasRef} />
+      <div
+        ref={tooltipRef}
+        style={{
+          display: "none",
+          position: "fixed",
+          pointerEvents: "none",
+          backgroundColor: "rgba(30, 30, 30, 0.82)",
+          color: "#f0f0f0",
+          fontSize: 12,
+          fontFamily: "monospace",
+          padding: "3px 7px",
+          borderRadius: 4,
+          whiteSpace: "nowrap",
+          zIndex: 9999,
+          lineHeight: 1.4,
+        }}
+      />
     </div>
   );
 }
