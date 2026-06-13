@@ -12,13 +12,17 @@ pub async fn process_command(
     text: String,
     app: tauri::AppHandle,
 ) -> Result<serde_json::Value, String> {
+    log::info!("process_command: '{}'", text);
+
     let result = preprocessor::preprocess(&text);
 
     match result {
         PreprocessResult::LocalAction { action, params } => {
+            log::info!("快捷指令匹配: action={}", action);
             execute_quick_action(&action, &params, &app)
         }
         PreprocessResult::NeedsLLM { cleaned_text } => {
+            log::info!("需要 LLM 处理: '{}'", cleaned_text);
             // 从环境变量读取 API Key（后续 Phase 7 改为配置）
             let api_key = std::env::var("DEEPSEEK_API_KEY")
                 .unwrap_or_else(|_| "sk-placeholder".into());
@@ -44,6 +48,8 @@ pub async fn process_command(
 
             match scheduler.process(&enriched_text, &history, &ENGINE).await {
                 Ok(result) => {
+                    log::info!("LLM 处理成功: {}", result.message);
+
                     // 保存快照用于 undo/redo
                     if let Some(ref state) = result.canvas_state {
                         ENGINE.snapshots.lock().unwrap().save(state.clone());
@@ -67,6 +73,7 @@ pub async fn process_command(
                     }))
                 }
                 Err(e) => {
+                    log::error!("LLM 处理失败: {}", e);
                     Ok(serde_json::json!({
                         "success": false,
                         "message": format!("LLM 处理失败: {}", e),
@@ -83,6 +90,7 @@ pub async fn quick_action(
     action: String,
     app: tauri::AppHandle,
 ) -> Result<serde_json::Value, String> {
+    log::info!("quick_action: {}", action);
     execute_quick_action(&action, &serde_json::Value::Null, &app)
 }
 
@@ -124,7 +132,10 @@ fn execute_quick_action(
             // 缩放和导出由前端处理，这里返回信号即可
             format!("快捷操作: {}", action)
         }
-        _ => return Err(format!("未知快捷操作: {}", action)),
+        _ => {
+            log::warn!("未知快捷操作: {}", action);
+            return Err(format!("未知快捷操作: {}", action));
+        }
     };
 
     // 发送事件通知前端更新

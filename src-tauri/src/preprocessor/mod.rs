@@ -12,17 +12,31 @@ pub enum PreprocessResult {
 
 /// 预处理管道
 pub fn preprocess(text: &str) -> PreprocessResult {
+    log::info!("预处理开始: '{}'", text);
+
     let cleaned = denoise::denoise(text);
     let corrected = denoise::correct_homophones(&cleaned);
 
+    log::info!("预处理: 去噪后='{}', 纠错后='{}'", cleaned, corrected);
+
     if corrected.trim().is_empty() {
-        return PreprocessResult::NeedsLLM { cleaned_text: String::new() };
+        log::warn!("预处理后文本为空");
+        return PreprocessResult::NeedsLLM {
+            cleaned_text: String::new(),
+        };
     }
 
     // 尝试快捷匹配
     if let Some(action) = quick_match::try_match(&corrected) {
-        return PreprocessResult::LocalAction { action: action.name, params: action.params };
+        log::info!("快捷匹配成功: {}", action.name);
+        return PreprocessResult::LocalAction {
+            action: action.name,
+            params: action.params,
+        };
     }
 
-    PreprocessResult::NeedsLLM { cleaned_text: corrected }
+    log::info!("未匹配快捷指令，转 LLM 处理");
+    PreprocessResult::NeedsLLM {
+        cleaned_text: corrected,
+    }
 }

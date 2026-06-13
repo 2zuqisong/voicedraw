@@ -18,6 +18,13 @@ impl SnapshotManager {
 
     /// 保存当前状态到 undo 栈，清空 redo 栈
     pub fn save(&mut self, state: CanvasState) {
+        log::debug!(
+            "快照保存: title='{}', 节点数={}, undo栈深度={}/{}",
+            state.title,
+            state.nodes.len(),
+            self.undo_stack.len() + 1,
+            self.max_size
+        );
         self.undo_stack.push(state);
         self.redo_stack.clear();
         if self.undo_stack.len() > self.max_size {
@@ -28,9 +35,16 @@ impl SnapshotManager {
     /// 撤销：弹出 undo 栈顶，当前状态压入 redo
     pub fn undo(&mut self, current: CanvasState) -> Option<CanvasState> {
         if let Some(prev) = self.undo_stack.pop() {
+            log::info!(
+                "撤销: title='{}' -> '{}', undo剩余={}",
+                current.title,
+                prev.title,
+                self.undo_stack.len()
+            );
             self.redo_stack.push(current);
             Some(prev)
         } else {
+            log::info!("撤销失败: undo 栈为空");
             None
         }
     }
@@ -38,9 +52,16 @@ impl SnapshotManager {
     /// 重做：弹出 redo 栈顶，当前状态压入 undo
     pub fn redo(&mut self, current: CanvasState) -> Option<CanvasState> {
         if let Some(next) = self.redo_stack.pop() {
+            log::info!(
+                "重做: title='{}' -> '{}', redo剩余={}",
+                current.title,
+                next.title,
+                self.redo_stack.len()
+            );
             self.undo_stack.push(current);
             Some(next)
         } else {
+            log::info!("重做失败: redo 栈为空");
             None
         }
     }

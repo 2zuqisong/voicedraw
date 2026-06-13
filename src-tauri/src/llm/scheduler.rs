@@ -32,6 +32,12 @@ impl LLMScheduler {
         history: &[(String, String)], // (role, content)
         engine: &AppEngine,
     ) -> Result<SchedulerResult, String> {
+        log::info!(
+            "LLM Scheduler: 处理指令 '{}', 历史 {} 轮",
+            user_text,
+            history.len() / 2
+        );
+
         let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
 
         // 1. System prompt
@@ -126,6 +132,8 @@ impl LLMScheduler {
 
         // 6. 多轮循环（最多 max_rounds 轮）
         for round in 0..self.max_rounds {
+            log::info!("LLM 第 {}/{} 轮...", round + 1, self.max_rounds);
+
             let response = self
                 .client
                 .chat(messages.clone(), tools.clone(), false)
@@ -141,11 +149,18 @@ impl LLMScheduler {
             if !has_tool_calls {
                 // LLM 返回了纯文本回复，对话结束
                 final_content = response.content.unwrap_or_else(|| "操作完成".into());
+                log::info!("LLM 返回纯文本回复，结束循环: {}", final_content);
                 break;
             }
 
             // 获取 tool_calls（此时已确认有值）
             let tool_calls = response.tool_calls.as_ref().unwrap();
+            log::info!(
+                "第 {} 轮 LLM 请求 {} 个工具调用: {:?}",
+                round + 1,
+                tool_calls.len(),
+                tool_calls.iter().map(|tc| tc.name.as_str()).collect::<Vec<_>>()
+            );
 
             // 将 assistant 消息（含 tool_calls）添加到对话历史
             // 将 DeepSeekClient 返回的 ToolCall 转换为 async_openai 的 ChatCompletionMessageToolCall
@@ -210,8 +225,13 @@ fn execute_tool_call(
     name: &str,
     arguments: &str,
 ) -> Result<String, String> {
+    log::info!("执行工具: {} args={}", name, arguments);
+
     let args: Value = serde_json::from_str(arguments)
-        .map_err(|e| format!("参数解析失败: {}", e))?;
+        .map_err(|e| {
+            log::error!("工具参数解析失败: {} | raw={}", e, arguments);
+            format!("参数解析失败: {}", e)
+        })?;
 
     let mut canvas = engine.canvas.lock().unwrap();
     let state = canvas.as_mut().ok_or("画布未初始化")?;
@@ -363,6 +383,9 @@ fn execute_tool_call(
         "get_canvas_state" => Ok(
             serde_json::to_string(&*state).unwrap_or_else(|_| "{}".into()),
         ),
-        _ => Err(format!("未知工具: {}", name)),
+        _ => {
+            log::error!("未知工具调用: {}", name);
+            Err(format!("未知工具: {}", name))
+        }
     }
 }
