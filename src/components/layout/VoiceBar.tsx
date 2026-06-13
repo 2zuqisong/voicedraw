@@ -67,27 +67,30 @@ export default function VoiceBar() {
 
   const isBusy = status !== "idle" && status !== "listening";
 
+  // Shared button dims
+  const btnSize = 40;
+
   return (
     <div
       style={{
         position: "absolute",
-        bottom: 20,
+        bottom: 32,
         left: "50%",
         transform: "translateX(-50%)",
         display: "flex",
         alignItems: "center",
-        gap: 8,
+        gap: 12,
         zIndex: 100,
         userSelect: "none",
       }}
     >
-      {/* Undo — subtle, edge-mounted on left */}
-      <div style={{ display: "flex", gap: 4 }}>
+      {/* Undo / Redo */}
+      <div style={{ display: "flex", gap: 6 }}>
         <button
           onClick={() => quickAction("undo")}
           disabled={status !== "idle"}
           className="btn-ghost"
-          style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+          style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}
           title="撤销"
         >
           ↺
@@ -96,55 +99,53 @@ export default function VoiceBar() {
           onClick={() => quickAction("redo")}
           disabled={status !== "idle"}
           className="btn-ghost"
-          style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}
+          style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}
           title="重做"
         >
           ↻
         </button>
       </div>
 
-      {/* Main interaction pill */}
+      {/* Main pill */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
+          gap: 10,
           background: "var(--surface)",
           border: isListening ? "1px solid var(--accent)" : "1px solid var(--border)",
           borderRadius: "var(--radius)",
-          padding: "4px 6px 4px 12px",
-          minWidth: 420,
+          padding: "8px 12px 8px 20px",
+          minWidth: 560,
           transition: "border-color 0.15s",
         }}
       >
-        {/* Waveform — slim, monochrome */}
-        <WaveformVisualizer isActive={isListening} barCount={16} />
+        <WaveformVisualizer isActive={isListening} barCount={20} />
 
         {isSupported ? (
           <>
-            {/* Cancel */}
             {isListening && (
               <button
                 onClick={handleCancel}
                 className="btn-ghost"
-                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}
+                style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0, fontWeight: 300 }}
                 title="取消"
               >
                 ✕
               </button>
             )}
 
-            {/* Transcript / prompt area */}
+            {/* Transcript / prompt */}
             <div
               onClick={isListening ? undefined : handleStart}
               style={{
                 flex: 1,
-                height: 28,
+                height: btnSize,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: isBusy ? "default" : "pointer",
-                padding: "0 8px",
+                padding: "0 12px",
                 overflow: "hidden",
                 background: isListening ? "var(--accent-dim)" : "transparent",
                 borderRadius: "var(--radius)",
@@ -154,13 +155,13 @@ export default function VoiceBar() {
               <span
                 style={{
                   fontFamily: "var(--font-mono)",
-                  fontSize: 12,
+                  fontSize: 16,
                   fontWeight: 300,
                   color: isListening ? "var(--accent)" : "var(--text-tertiary)",
                   whiteSpace: "nowrap",
                   textOverflow: "ellipsis",
                   overflow: "hidden",
-                  letterSpacing: "0.01em",
+                  letterSpacing: "0.02em",
                 }}
               >
                 {isListening
@@ -175,13 +176,12 @@ export default function VoiceBar() {
               </span>
             </div>
 
-            {/* Confirm */}
             {isListening && (
               <button
                 onClick={handleConfirm}
                 disabled={transcript.trim().length === 0}
                 className={transcript.trim().length > 0 ? "btn-accent" : "btn-ghost"}
-                style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}
+                style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}
                 title="确认"
               >
                 ✓
@@ -190,8 +190,7 @@ export default function VoiceBar() {
           </>
         ) : (
           <>
-            {/* Text fallback */}
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--text-tertiary)", flexShrink: 0 }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, color: "var(--text-tertiary)", flexShrink: 0 }}>
               ⌨
             </span>
             <input
@@ -203,12 +202,12 @@ export default function VoiceBar() {
               disabled={status !== "idle"}
               style={{
                 flex: 1,
-                height: 28,
+                height: btnSize,
                 border: "none",
                 background: "transparent",
-                padding: "0 6px",
+                padding: "0 10px",
                 fontFamily: "var(--font-mono)",
-                fontSize: 12,
+                fontSize: 16,
                 fontWeight: 300,
                 outline: "none",
                 color: "var(--text-primary)",
@@ -219,7 +218,7 @@ export default function VoiceBar() {
               onClick={handleTextSubmit}
               disabled={draftText.trim().length === 0 || status !== "idle"}
               className={draftText.trim().length > 0 && status === "idle" ? "btn-accent" : "btn-ghost"}
-              style={{ width: 28, height: 28, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}
+              style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}
               title="发送"
             >
               →
