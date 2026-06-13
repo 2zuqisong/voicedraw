@@ -250,16 +250,17 @@ function renderNode(
   switch (node_type) {
     case "Start":
     case "End":
-      shape = new fabric.Rect({
-        left: position.x,
-        top: position.y,
-        width: size.width,
-        height: size.height,
-        rx: size.height / 2,
+      // 用 Ellipse 画真正的椭圆/圆形（符合流程图规范）
+      shape = new fabric.Ellipse({
+        left: position.x + size.width / 2,
+        top: position.y + size.height / 2,
+        rx: size.width / 2,
         ry: size.height / 2,
         fill: style.fill,
         stroke: style.stroke,
         strokeWidth: style.stroke_width,
+        originX: "center",
+        originY: "center",
       });
       break;
 
