@@ -32,10 +32,63 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
   );
 }
 
+/** 渲染坐标网格背景 */
+function renderGrid(canvas: fabric.Canvas, state: CanvasState): void {
+  const { grid_size, grid_origin_x, grid_origin_y, width, height } = state;
+
+  // 细线（每格一条，淡红）
+  for (let x = grid_origin_x; x <= width; x += grid_size) {
+    const line = new fabric.Line([x, 0, x, height], {
+      stroke: "#f0cccc",
+      strokeWidth: 0.3,
+      selectable: false,
+      evented: false,
+    });
+    canvas.add(line);
+    canvas.sendObjectToBack(line);
+  }
+  for (let y = grid_origin_y; y <= height; y += grid_size) {
+    const line = new fabric.Line([0, y, width, y], {
+      stroke: "#f0cccc",
+      strokeWidth: 0.3,
+      selectable: false,
+      evented: false,
+    });
+    canvas.add(line);
+    canvas.sendObjectToBack(line);
+  }
+
+  // 粗线（每 5 格一条，稍深）
+  const majorStep = grid_size * 5;
+  for (let x = grid_origin_x; x <= width; x += majorStep) {
+    const line = new fabric.Line([x, 0, x, height], {
+      stroke: "#e8b0b0",
+      strokeWidth: 0.8,
+      selectable: false,
+      evented: false,
+    });
+    canvas.add(line);
+    canvas.sendObjectToBack(line);
+  }
+  for (let y = grid_origin_y; y <= height; y += majorStep) {
+    const line = new fabric.Line([0, y, width, y], {
+      stroke: "#e8b0b0",
+      strokeWidth: 0.8,
+      selectable: false,
+      evented: false,
+    });
+    canvas.add(line);
+    canvas.sendObjectToBack(line);
+  }
+}
+
 /** 将 CanvasState 渲染到 Fabric.js */
 function renderCanvasState(canvas: fabric.Canvas, state: CanvasState): void {
   canvas.clear();
   canvas.backgroundColor = state.theme === "Dark" ? "#263238" : "#fafafa";
+
+  // 先渲染网格背景
+  renderGrid(canvas, state);
 
   // 渲染连线
   for (const edge of Object.values(state.edges)) {
