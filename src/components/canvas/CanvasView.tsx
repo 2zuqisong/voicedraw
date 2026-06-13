@@ -264,16 +264,22 @@ function renderNode(
       break;
 
     case "Decision":
-      shape = new fabric.Rect({
-        left: position.x,
-        top: position.y,
-        width: size.width,
-        height: size.height,
-        fill: style.fill,
-        stroke: style.stroke,
-        strokeWidth: style.stroke_width,
-        angle: 45,
-      });
+      // 用 Polygon 画真正的菱形（四个顶点），而非旋转矩形
+      shape = new fabric.Polygon(
+        [
+          { x: size.width / 2, y: 0 },
+          { x: size.width, y: size.height / 2 },
+          { x: size.width / 2, y: size.height },
+          { x: 0, y: size.height / 2 },
+        ],
+        {
+          left: position.x,
+          top: position.y,
+          fill: style.fill,
+          stroke: style.stroke,
+          strokeWidth: style.stroke_width,
+        },
+      );
       break;
 
     case "Data":
