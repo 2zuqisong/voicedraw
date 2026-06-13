@@ -71,6 +71,9 @@ export interface CanvasState {
   theme: Theme;
   width: number;
   height: number;
+  grid_size: number;
+  grid_origin_x: number;
+  grid_origin_y: number;
 }
 
 export interface NodeSummary {

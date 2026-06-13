@@ -7,35 +7,180 @@ interface CanvasViewProps {
   canvasState: CanvasState | null;
 }
 
+/** 默认网格参数 */
+const DEFAULT_GRID = {
+  grid_size: 20,
+  grid_origin_x: 40,
+  grid_origin_y: 24,
+};
+
 export default function CanvasView({ canvasState }: CanvasViewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
 
-  // 初始化 Fabric.js
+  // 初始化 Fabric.js + 渲染网格 + 自适应窗口
   useEffect(() => {
-    if (!canvasRef.current) return;
-    const { canvas, cleanup } = initFabricCanvas(canvasRef.current);
+    if (!canvasRef.current || !containerRef.current) return;
+
+    // 用窗口尺寸初始化（比 getBoundingClientRect 更可靠）
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    const { canvas, cleanup } = initFabricCanvas(canvasRef.current, w, h);
     fabricRef.current = canvas;
-    return cleanup;
+    renderGrid(canvas, w, h);
+
+    // ResizeObserver：容器大小变化时更新画布和网格
+    let firstResize = true;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width: cw, height: ch } = entry.contentRect;
+        if (!canvas || cw === 0 || ch === 0) return;
+
+        // 首次触发时容器已有真实尺寸，覆盖初始化尺寸
+        if (firstResize) {
+          firstResize = false;
+          if (Math.abs(cw - w) < 20 && Math.abs(ch - h) < 20) return;
+        }
+
+        canvas.setWidth(cw);
+        canvas.setHeight(ch);
+        canvas.calcOffset();
+
+        // 移除旧网格线，重新绘制
+        const toRemove: fabric.Object[] = [];
+        canvas.getObjects().forEach((obj) => {
+          if ((obj as any).isGridLine) toRemove.push(obj);
+        });
+        toRemove.forEach((obj) => canvas.remove(obj));
+        renderGrid(canvas, cw, ch);
+        canvas.requestRenderAll();
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => {
+      observer.disconnect();
+      cleanup();
+    };
   }, []);
 
-  // 当 canvasState 变化时重新渲染
+  // 当 canvasState 变化时渲染节点和连线（网格保留不动）
+  const prevStateRef = useRef<CanvasState | null>(null);
   useEffect(() => {
-    if (!fabricRef.current || !canvasState) return;
-    renderCanvasState(fabricRef.current, canvasState);
+    const canvas = fabricRef.current;
+    if (!canvas || !canvasState) return;
+
+    // 判断是否需要全量重绘
+    const prev = prevStateRef.current;
+    const needsFullRender =
+      !prev ||
+      prev.nodes !== canvasState.nodes ||
+      prev.edges !== canvasState.edges ||
+      prev.theme !== canvasState.theme;
+
+    if (needsFullRender) {
+      prevStateRef.current = canvasState;
+      renderCanvasState(canvas, canvasState);
+    }
   }, [canvasState]);
 
   return (
-    <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
+    <div
+      ref={containerRef}
+      style={{ flex: 1, overflow: "hidden", position: "relative" }}
+    >
       <canvas ref={canvasRef} />
     </div>
   );
 }
 
-/** 将 CanvasState 渲染到 Fabric.js */
-function renderCanvasState(canvas: fabric.Canvas, state: CanvasState): void {
-  canvas.clear();
-  canvas.backgroundColor = state.theme === "Dark" ? "#263238" : "#fafafa";
+/** 渲染坐标网格背景（使用实际像素尺寸，不依赖 CanvasState） */
+function renderGrid(
+  canvas: fabric.Canvas,
+  width: number,
+  height: number,
+): void {
+  const { grid_size, grid_origin_x, grid_origin_y } = DEFAULT_GRID;
+
+  const lines: fabric.Line[] = [];
+
+  // 细线（每格一条，淡红）
+  for (let x = grid_origin_x; x <= width; x += grid_size) {
+    const line = new fabric.Line([x, 0, x, height], {
+      stroke: "#f4cccc",
+      strokeWidth: 0.5,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+    });
+    (line as any).isGridLine = true;
+    lines.push(line);
+  }
+  for (let y = grid_origin_y; y <= height; y += grid_size) {
+    const line = new fabric.Line([0, y, width, y], {
+      stroke: "#f4cccc",
+      strokeWidth: 0.5,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+    });
+    (line as any).isGridLine = true;
+    lines.push(line);
+  }
+
+  // 粗线（每 5 格一条，稍深）
+  const majorStep = grid_size * 5;
+  for (let x = grid_origin_x; x <= width; x += majorStep) {
+    const line = new fabric.Line([x, 0, x, height], {
+      stroke: "#e8b0b0",
+      strokeWidth: 0.8,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+    });
+    (line as any).isGridLine = true;
+    lines.push(line);
+  }
+  for (let y = grid_origin_y; y <= height; y += majorStep) {
+    const line = new fabric.Line([0, y, width, y], {
+      stroke: "#e8b0b0",
+      strokeWidth: 0.8,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+    });
+    (line as any).isGridLine = true;
+    lines.push(line);
+  }
+
+  // 批量添加到画布
+  const prevRenderOnAddRemove = canvas.renderOnAddRemove;
+  canvas.renderOnAddRemove = false;
+  for (const line of lines) {
+    canvas.add(line);
+  }
+  canvas.renderOnAddRemove = prevRenderOnAddRemove;
+  canvas.requestRenderAll();
+}
+
+/** 将 CanvasState 渲染到 Fabric.js（不清除网格线） */
+function renderCanvasState(
+  canvas: fabric.Canvas,
+  state: CanvasState,
+): void {
+  // 移除非网格对象（节点、连线、标签）
+  const toRemove: fabric.Object[] = [];
+  canvas.getObjects().forEach((obj) => {
+    if (!(obj as any).isGridLine) {
+      toRemove.push(obj);
+    }
+  });
+  toRemove.forEach((obj) => canvas.remove(obj));
+
+  canvas.backgroundColor =
+    state.theme === "Dark" ? "#263238" : "#fafafa";
 
   // 渲染连线
   for (const edge of Object.values(state.edges)) {
@@ -51,7 +196,10 @@ function renderCanvasState(canvas: fabric.Canvas, state: CanvasState): void {
 }
 
 /** 渲染单个节点 */
-function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): void {
+function renderNode(
+  canvas: fabric.Canvas,
+  node: CanvasState["nodes"][string],
+): void {
   const { position, size, style, label, node_type } = node;
 
   let shape: fabric.Object;
@@ -64,7 +212,7 @@ function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): 
         top: position.y,
         width: size.width,
         height: size.height,
-        rx: size.height / 2,  // 圆角矩形（胶囊形）
+        rx: size.height / 2,
         ry: size.height / 2,
         fill: style.fill,
         stroke: style.stroke,
@@ -73,7 +221,6 @@ function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): 
       break;
 
     case "Decision":
-      // 菱形：用旋转45度的矩形
       shape = new fabric.Rect({
         left: position.x,
         top: position.y,
@@ -87,7 +234,6 @@ function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): 
       break;
 
     case "Data":
-      // 平行四边形（用 skewX 近似）
       shape = new fabric.Rect({
         left: position.x,
         top: position.y,
@@ -100,7 +246,7 @@ function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): 
       });
       break;
 
-    default: // Process, Subprocess, Text
+    default:
       shape = new fabric.Rect({
         left: position.x,
         top: position.y,
@@ -114,13 +260,12 @@ function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): 
       });
   }
 
-  // 添加文字标签
   const text = new fabric.Text(label, {
     left: position.x + size.width / 2,
     top: position.y + size.height / 2,
     fontSize: style.font_size,
     fontFamily: style.font_family,
-    fill: node_type === "Decision" ? "#333" : "#333",
+    fill: "#333",
     originX: "center",
     originY: "center",
     textAlign: "center",
@@ -130,7 +275,6 @@ function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): 
     left: position.x,
     top: position.y,
   });
-  // fabric 6.x 不支持在构造参数中传 data，需在创建后设置
   (group as any).data = { nodeId: node.id, nodeType: node_type };
 
   canvas.add(group);
@@ -140,7 +284,7 @@ function renderNode(canvas: fabric.Canvas, node: CanvasState["nodes"][string]): 
 function renderEdge(
   canvas: fabric.Canvas,
   edge: CanvasState["edges"][string],
-  nodes: CanvasState["nodes"]
+  nodes: CanvasState["nodes"],
 ): void {
   const fromNode = nodes[edge.from_id];
   const toNode = nodes[edge.to_id];
@@ -151,9 +295,12 @@ function renderEdge(
   const toX = toNode.position.x + toNode.size.width / 2;
   const toY = toNode.position.y;
 
-  const dashArray = edge.style.line_style === "Dashed" ? [8, 4]
-    : edge.style.line_style === "Dotted" ? [2, 4]
-    : undefined;
+  const dashArray =
+    edge.style.line_style === "Dashed"
+      ? [8, 4]
+      : edge.style.line_style === "Dotted"
+        ? [2, 4]
+        : undefined;
 
   const line = new fabric.Line([fromX, fromY, toX, toY], {
     stroke: edge.style.stroke,
@@ -163,9 +310,7 @@ function renderEdge(
   (line as any).data = { edgeId: edge.id };
 
   canvas.add(line);
-  canvas.sendObjectToBack(line); // 连线在节点下方
 
-  // 边标签
   if (edge.label) {
     const label = new fabric.Text(edge.label, {
       left: (fromX + toX) / 2,

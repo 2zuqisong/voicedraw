@@ -27,6 +27,14 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                             },
                             "required": ["type", "label"]
                         }
+                    },
+                    "grid_x": {
+                        "type": "number",
+                        "description": "网格 X 坐标（可选，不填则自动找空位）。1格=20像素"
+                    },
+                    "grid_y": {
+                        "type": "number",
+                        "description": "网格 Y 坐标（可选，不填则自动找空位）。1格=20像素"
                     }
                 },
                 "required": ["nodes"]
@@ -68,6 +76,14 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                             "x": {"type": "number"},
                             "y": {"type": "number"}
                         }
+                    },
+                    "grid_x": {
+                        "type": "number",
+                        "description": "网格 X 坐标（可选，不填则自动找空位）。1格=20像素"
+                    },
+                    "grid_y": {
+                        "type": "number",
+                        "description": "网格 Y 坐标（可选，不填则自动找空位）。1格=20像素"
                     }
                 },
                 "required": ["type", "label"]
@@ -156,6 +172,15 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
             json!({
                 "type": "object",
                 "properties": {}
+            }),
+        ),
+        tool(
+            "get_empty_anchor",
+            "获取画布上当前未被占用的推荐锚点坐标，用于放置新图表",
+            json!({
+                "type": "object",
+                "properties": {},
+                "required": []
             }),
         ),
     ]

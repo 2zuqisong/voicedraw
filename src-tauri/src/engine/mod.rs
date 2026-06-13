@@ -4,6 +4,7 @@ pub mod edge_ops;
 pub mod layout;
 pub mod style_ops;
 pub mod snapshot;
+pub mod grid;
 
 pub use canvas_state::*;
 
@@ -29,6 +30,9 @@ impl AppEngine {
             theme: Theme::Default,
             width: 1200.0,
             height: 800.0,
+            grid_size: 20.0,
+            grid_origin_x: 40.0,
+            grid_origin_y: 24.0,
         };
         Self {
             canvas: Mutex::new(Some(default_canvas)),
