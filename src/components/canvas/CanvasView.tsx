@@ -330,7 +330,7 @@ function renderNode(
   canvas.add(group);
 }
 
-/** 渲染单条连线 */
+/** 渲染单条连线（含箭头） */
 function renderEdge(
   canvas: fabric.Canvas,
   edge: CanvasState["edges"][string],
@@ -340,10 +340,45 @@ function renderEdge(
   const toNode = nodes[edge.to_id];
   if (!fromNode || !toNode) return;
 
-  const fromX = fromNode.position.x + fromNode.size.width / 2;
-  const fromY = fromNode.position.y + fromNode.size.height;
-  const toX = toNode.position.x + toNode.size.width / 2;
-  const toY = toNode.position.y;
+  // 计算两节点中心
+  const fromCX = fromNode.position.x + fromNode.size.width / 2;
+  const fromCY = fromNode.position.y + fromNode.size.height / 2;
+  const toCX = toNode.position.x + toNode.size.width / 2;
+  const toCY = toNode.position.y + toNode.size.height / 2;
+
+  const dx = toCX - fromCX;
+  const dy = toCY - fromCY;
+
+  // 根据两节点相对位置选择最佳的连接点（边的中点）
+  let fromX: number, fromY: number, toX: number, toY: number;
+
+  if (Math.abs(dx) > Math.abs(dy)) {
+    // 水平方向为主：从左节点的右边 → 右节点的左边
+    if (dx > 0) {
+      fromX = fromNode.position.x + fromNode.size.width;
+      fromY = fromCY;
+      toX = toNode.position.x;
+      toY = toCY;
+    } else {
+      fromX = fromNode.position.x;
+      fromY = fromCY;
+      toX = toNode.position.x + toNode.size.width;
+      toY = toCY;
+    }
+  } else {
+    // 垂直方向为主：从上节点的下边 → 下节点的上边
+    if (dy > 0) {
+      fromX = fromCX;
+      fromY = fromNode.position.y + fromNode.size.height;
+      toX = toCX;
+      toY = toNode.position.y;
+    } else {
+      fromX = fromCX;
+      fromY = fromNode.position.y;
+      toX = toCX;
+      toY = toNode.position.y + toNode.size.height;
+    }
+  }
 
   const dashArray =
     edge.style.line_style === "Dashed"
@@ -358,8 +393,25 @@ function renderEdge(
     strokeDashArray: dashArray,
   });
   (line as any).data = { edgeId: edge.id };
-
   canvas.add(line);
+
+  // 箭头（三角形）
+  const angle = Math.atan2(toY - fromY, toX - fromX);
+  const arrowSize = 10;
+  const arrow = new fabric.Triangle({
+    left: toX,
+    top: toY,
+    width: arrowSize * 2,
+    height: arrowSize * 1.6,
+    fill: edge.style.stroke,
+    angle: (angle * 180) / Math.PI + 90,
+    originX: "center",
+    originY: "center",
+    selectable: false,
+    evented: false,
+  });
+  (arrow as any).data = { edgeId: edge.id, isArrow: true };
+  canvas.add(arrow);
 
   if (edge.label) {
     const label = new fabric.Text(edge.label, {
