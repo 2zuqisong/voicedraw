@@ -243,11 +243,32 @@ fn execute_tool_call(
             )
             .map_err(|e| format!("{}", e))?;
             let label = args["label"].as_str().unwrap_or("未命名").to_string();
+
+            // 如果提供了网格坐标，转换为像素位置
+            let position = if let (Some(gx), Some(gy)) =
+                (args["grid_x"].as_f64(), args["grid_y"].as_f64())
+            {
+                let grid_cfg = crate::engine::grid::GridConfig::default();
+                let (px, py) = grid_cfg.grid_to_pixel(gx, gy);
+                Some(crate::engine::canvas_state::Position { x: px, y: py })
+            } else if let (Some(x), Some(y)) = (
+                args["position"]
+                    .as_object()
+                    .and_then(|p| p["x"].as_f64()),
+                args["position"]
+                    .as_object()
+                    .and_then(|p| p["y"].as_f64()),
+            ) {
+                Some(crate::engine::canvas_state::Position { x, y })
+            } else {
+                None
+            };
+
             let node = crate::engine::node_ops::add_node(
                 &mut state.nodes,
                 node_type,
                 label,
-                None,
+                position,
                 None,
             );
             Ok(serde_json::json!({"node_id": node.id, "label": node.label}).to_string())
@@ -269,6 +290,40 @@ fn execute_tool_call(
                 .collect();
             let created =
                 crate::engine::node_ops::add_nodes_batch(&mut state.nodes, batch);
+
+            // 确定锚点坐标
+            let (base_px, base_py) = if let (Some(gx), Some(gy)) =
+                (args["grid_x"].as_f64(), args["grid_y"].as_f64())
+            {
+                // 用户指定了网格坐标
+                let grid_cfg = crate::engine::grid::GridConfig::default();
+                grid_cfg.grid_to_pixel(gx, gy)
+            } else {
+                // 未指定坐标，自动找空白位置
+                let grid_cfg = crate::engine::grid::GridConfig::default();
+                let (auto_gx, auto_gy) = grid_cfg.find_empty_anchor(&state.nodes);
+                log::info!(
+                    "自动锚点: grid({}, {}), pixel({}, {})",
+                    auto_gx,
+                    auto_gy,
+                    grid_cfg.grid_to_pixel(auto_gx, auto_gy).0,
+                    grid_cfg.grid_to_pixel(auto_gx, auto_gy).1
+                );
+                grid_cfg.grid_to_pixel(auto_gx, auto_gy)
+            };
+
+            // 偏移所有新节点到锚点
+            if let Some(first) = created.first() {
+                let dx = base_px - first.position.x;
+                let dy = base_py - first.position.y;
+                for node in &created {
+                    if let Some(n) = state.nodes.get_mut(&node.id) {
+                        n.position.x += dx;
+                        n.position.y += dy;
+                    }
+                }
+            }
+
             // 自动布局
             let moved = crate::engine::layout::auto_layout(
                 &mut state.nodes,
@@ -383,6 +438,19 @@ fn execute_tool_call(
         "get_canvas_state" => Ok(
             serde_json::to_string(&*state).unwrap_or_else(|_| "{}".into()),
         ),
+        "get_empty_anchor" => {
+            let grid_cfg = crate::engine::grid::GridConfig::default();
+            let (gx, gy) = grid_cfg.find_empty_anchor(&state.nodes);
+            let (px, py) = grid_cfg.grid_to_pixel(gx, gy);
+            Ok(serde_json::json!({
+                "grid_x": gx,
+                "grid_y": gy,
+                "pixel_x": px,
+                "pixel_y": py,
+                "message": format!("推荐锚点: 网格({}, {}), 像素({}, {})", gx, gy, px, py)
+            })
+            .to_string())
+        }
         _ => {
             log::error!("未知工具调用: {}", name);
             Err(format!("未知工具: {}", name))
