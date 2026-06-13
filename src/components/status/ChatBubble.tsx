@@ -36,7 +36,7 @@ export default function ChatBubble() {
       }}
       style={{
         position: "absolute",
-        bottom: 64,
+        bottom: 100,
         left: "50%",
         transform: "translateX(-50%)",
         maxWidth: 480,
