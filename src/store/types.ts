@@ -137,6 +137,13 @@ export interface OperationPlan {
   estimated_tool_calls: number;
 }
 
+/** 待前端执行的异步操作（如风格转换需捕获 canvas 图像） */
+export interface PendingAction {
+  action_type: string;
+  prompt: string;
+  node_ids: string[];
+}
+
 export interface PlanNode {
   label: string;
   type: string;
@@ -152,4 +159,18 @@ export interface PlanEdge {
 export interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+/** 风格转换请求（前端 → Rust） */
+export interface StyleTransferRequest {
+  image_base64: string;
+  prompt: string;
+  node_ids: string[];
+}
+
+/** 风格转换结果（Rust → 前端） */
+export interface StyleTransferResult {
+  image_base64: string;
+  /** 原节点 ID 列表（前端需移除这些节点） */
+  replaced_node_ids: string[];
 }

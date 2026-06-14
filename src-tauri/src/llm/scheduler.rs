@@ -423,6 +423,7 @@ impl LLMScheduler {
         Ok(SchedulerResult {
             message: final_content,
             canvas_state,
+            pending_action: None,
         })
     }
 }
@@ -439,6 +440,8 @@ pub enum ProcessResult {
 pub struct SchedulerResult {
     pub message: String,
     pub canvas_state: Option<crate::engine::canvas_state::CanvasState>,
+    /// 需要前端先处理的异步操作（如风格转换需要前端捕获 canvas 图像）
+    pub pending_action: Option<crate::engine::canvas_state::PendingAction>,
 }
 
 /// 执行单个工具调用，返回 JSON 字符串结果
