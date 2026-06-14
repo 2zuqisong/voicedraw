@@ -140,7 +140,7 @@ impl Default for NodeStyle {
             stroke: "#333333".into(),
             stroke_width: 2.0,
             font_size: 14.0,
-            font_family: "sans-serif".into(),
+            font_family: "Noto Sans SC, Microsoft YaHei, sans-serif".into(),
             border_radius: 8.0,
             opacity: 1.0,
             text_color: "#1a1a1a".into(),

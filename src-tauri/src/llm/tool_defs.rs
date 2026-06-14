@@ -215,6 +215,24 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                 "required": ["prompt"]
             }),
         ),
+        tool(
+            "apply_template",
+            "应用预设模板一键生成组合。用户说'画贺卡'/'画天气'/'画思维导图'/'画基础流程'时调用。",
+            json!({
+                "type": "object",
+                "properties": {
+                    "template": {
+                        "type": "string",
+                        "enum": ["birthday_card", "weather_scene", "love_card", "flowchart_starter", "mind_map_3"],
+                        "description": "模板名称"
+                    },
+                    "grid_x": {"type": "number", "description": "网格 X 坐标"},
+                    "grid_y": {"type": "number", "description": "网格 Y 坐标"},
+                    "title": {"type": "string", "description": "覆盖模板中的默认标题文字"}
+                },
+                "required": ["template"]
+            }),
+        ),
     ]
 }
 
