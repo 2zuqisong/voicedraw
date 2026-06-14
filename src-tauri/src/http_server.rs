@@ -393,6 +393,12 @@ async fn handle_style_transfer(
     }
 }
 
+async fn handle_reset_context() -> Json<serde_json::Value> {
+    let mut ctx = ENGINE.context.lock().unwrap();
+    ctx.clear();
+    Json(serde_json::json!({"success": true}))
+}
+
 async fn handle_snapshot_status() -> Json<serde_json::Value> {
     let snapshots = ENGINE.snapshots.lock().unwrap();
     Json(serde_json::json!({
@@ -422,7 +428,8 @@ pub fn start() {
                 .route("/api/cancel_plan", post(handle_cancel_plan))
                 .route("/api/modify_plan", post(handle_modify_plan))
                 .route("/api/apply_style_transfer", post(handle_style_transfer))
-                .route("/api/get_snapshot_status", get(handle_snapshot_status))
+                .route("/api/reset_context", post(handle_reset_context))
+            .route("/api/get_snapshot_status", get(handle_snapshot_status))
                 .layer(cors);
 
             let listener = tokio::net::TcpListener::bind("127.0.0.1:1421").await.unwrap();

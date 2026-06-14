@@ -346,6 +346,15 @@ fn execute_quick_action(
     }))
 }
 
+/// 切换模式时清除对话上下文，防止跨模式信息泄露
+#[tauri::command]
+pub fn reset_context() -> Result<serde_json::Value, String> {
+    let mut ctx = ENGINE.context.lock().unwrap();
+    ctx.clear();
+    log::info!("对话上下文已清除");
+    Ok(serde_json::json!({"success": true}))
+}
+
 /// 查询快照状态（undo/redo 是否可用）
 #[tauri::command]
 pub fn get_snapshot_status() -> Result<serde_json::Value, String> {

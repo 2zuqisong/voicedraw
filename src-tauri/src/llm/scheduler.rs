@@ -337,24 +337,26 @@ impl LLMScheduler {
                 .join("\n")
         };
 
-        // 4. 当前 canvas 状态摘要（作为上下文注入）
+        // 4. 当前 canvas 状态摘要（按模式过滤，不暴露另一模式的数据）
         let canvas_summary = {
             let canvas = engine.canvas.lock().unwrap();
             canvas.as_ref().map(|c| {
-                let mut s = format!(
-                    "当前画布: {}, 节点数: {}, 连线数: {}, 主题: {:?}",
-                    c.title,
-                    c.nodes.len(),
-                    c.edges.len(),
-                    c.theme
-                );
-                if let Some(ref pixel) = c.pixel {
-                    s.push_str(&format!(
-                        "\n像素画布: {}×{} 网格, {} 个彩色格子",
-                        pixel.cols, pixel.rows, pixel.cells.len()
-                    ));
+                if self.canvas_mode.as_deref() == Some("pixel") {
+                    // 像素模式：只显示像素信息
+                    let pixel_info = c.pixel.as_ref().map(|p| {
+                        format!("像素画布: {}×{} 网格, {} 个彩色格子", p.cols, p.rows, p.cells.len())
+                    }).unwrap_or_else(|| "像素画布为空".into());
+                    pixel_info
+                } else {
+                    // 矢量模式：只显示节点/连线信息
+                    format!(
+                        "当前画布: {}, 节点数: {}, 连线数: {}, 主题: {:?}",
+                        c.title,
+                        c.nodes.len(),
+                        c.edges.len(),
+                        c.theme
+                    )
                 }
-                s
             }).unwrap_or_default()
         };
 

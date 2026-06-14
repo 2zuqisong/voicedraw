@@ -85,7 +85,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ── 像素模式 ──
   canvasMode: "vector",
   pixel: createDefaultPixel(),
-  setCanvasMode: (mode) => set({ canvasMode: mode }),
+  setCanvasMode: (mode) => {
+    set({ canvasMode: mode, lastOperation: "", conversation: [] });
+    // 清除 Rust 端对话上下文，防止 LLM 跨模式引用
+    invoke("reset_context").catch(() => {});
+  },
 
   /** 从 canvasState.pixel 同步到本地 Zustand（LLM 修改后触发） */
   _syncPixelFromCanvas: () => {

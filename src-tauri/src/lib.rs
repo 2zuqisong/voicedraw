@@ -24,6 +24,7 @@ pub fn run() {
             commands::modify_plan,
             commands::apply_style_transfer,
             commands::get_snapshot_status,
+            commands::reset_context,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
