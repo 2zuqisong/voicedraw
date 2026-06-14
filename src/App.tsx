@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import CanvasView from "./components/canvas/CanvasView";
 import PixelCanvas from "./components/canvas/PixelCanvas";
+import PixelChatBubble from "./components/status/PixelChatBubble";
 import CanvasOverlay from "./components/canvas/CanvasOverlay";
 import OperationPreview from "./components/canvas/OperationPreview";
 import ChatBubble from "./components/status/ChatBubble";
@@ -28,6 +29,7 @@ function App() {
         {canvasMode === "pixel" ? (
           <>
             <PixelCanvas />
+            <PixelChatBubble />
             <VoiceBar />
           </>
         ) : (

@@ -21,6 +21,7 @@ struct ProcessCommandArgs {
     llm_api_key: Option<String>,
     llm_endpoint: Option<String>,
     llm_model: Option<String>,
+    canvas_mode: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -99,7 +100,7 @@ async fn handle_process_command(
                 guard.take().unwrap()
             };
 
-            let result = scheduler.process(&enriched_text, &history, &ENGINE, None).await;
+            let result = scheduler.process(&enriched_text, &history, &ENGINE, args.canvas_mode.as_deref()).await;
 
             // Put scheduler back
             *LLM_SCHEDULER.lock().unwrap() = Some(scheduler);
