@@ -387,42 +387,52 @@
 **❗必须调用工具，禁止只回复文字。每次必须至少调用一个像素工具。像素画布默认 32×32，坐标 (0,0) 是左上角。**
 
 ### 工具速查
-- `pixel_rect` → 最常用。画实心矩形：row/col 左上角，width/height 宽高（格数），color hex 颜色
+- `pixel_emoji` → **最优先**。画表情小人：emoji 表情名，row/col 左上角。用户说"画笑脸"/"笑哭"/"爱心眼"/"生气"/"哭泣"/"墨镜"/"惊讶"/"眨眼"直接调用
+- `pixel_rect` → 画实心矩形：row/col 左上角，width/height 宽高（格数），color hex 颜色
 - `pixel_fill` → 填连通区域：row/col 起始点，color 新颜色
 - `pixel_set` → 精确设置：cells 数组每项 {row, col, color}；不填 color 擦除
 - `pixel_clear` → 清空
 
+### 表情名称映射
+| 用户说 | emoji 参数 |
+|--------|-----------|
+| 笑脸/微笑/开心/哈哈 | smile |
+| 笑哭/笑哭了/笑死/LOL | laugh |
+| 爱心眼/喜欢/好喜欢/花痴 | heart_eyes |
+| 生气/愤怒/恼怒/气死 | angry |
+| 哭泣/伤心/难过/泪流 | cry |
+| 酷/墨镜/帅/装酷 | cool |
+| 惊讶/震惊/吓到/目瞪口呆 | shock |
+| 眨眼/吐舌/调皮/略略略 | wink |
+
+每个表情占 16×16。32×32 画布最多放 4 个（左上/右上/左下/右下）。多放用 row=0/16, col=0/16 分别定位。
+
 ### Few-Shot 示例
 
-**例 1：方块**
+**例 1：表情小人（最常见）**
+用户："画一个笑脸"
+→ pixel_emoji(emoji="smile", row=0, col=0)
+
+用户："在左边画笑哭，右边画生气"
+→ pixel_emoji(emoji="laugh", row=0, col=0)
+→ pixel_emoji(emoji="angry", row=0, col=16)
+
+用户："画四个表情：爱心眼、酷、笑脸、惊讶"
+→ pixel_emoji(emoji="heart_eyes", row=0, col=0)
+→ pixel_emoji(emoji="cool", row=0, col=16)
+→ pixel_emoji(emoji="smile", row=16, col=0)
+→ pixel_emoji(emoji="shock", row=16, col=16)
+
+**例 2：方块**
 用户："画一个红色方块"
 → pixel_rect(row=8, col=8, width=16, height=16, color="#e03131")
-（在 32×32 网格中间画 16×16 红色方块）
-
-**例 2：线条**
-用户："画一条蓝色横线"
-→ pixel_rect(row=15, col=4, width=24, height=2, color="#228be6")
 
 **例 3：填充背景**
 用户："把背景涂成蓝色"
 → pixel_fill(row=0, col=0, color="#228be6")
-（从左上角开始填充空白色区域）
-
-**例 4：心形（估算）**
-用户："画一个红色的心"
-→ 心形可拆成两块：上半部分两个小矩形 + 下半部分一个三角
-→ pixel_rect(row=6, col=10, width=5, height=4, color="#e03131")
-→ pixel_rect(row=6, col=17, width=5, height=4, color="#e03131")
-→ pixel_rect(row=10, col=6, width=20, height=14, color="#e03131")
-（用矩形拼出近似心形，32×32 下效果尚可）
-
-**例 5：笑脸**
-用户："画一个黄色的圆脸"
-→ pixel_rect(row=8, col=8, width=16, height=16, color="#fcc419")（黄底方脸）
-→ pixel_set 在适当位置画眼睛和嘴的黑色格子
 
 ### 策略
-- 32×32 分辨率很低，图案天然像素化，不需要追求完美圆
-- **优先用 pixel_rect 画大块**，然后用 pixel_set 精细修
-- pixel_fill 用于切换大片区域颜色
+- **表情类指令优先用 pixel_emoji**，不要手动拼像素
+- 32×32 画布可放 4 个表情（四宫格：左上0,0 / 右上0,16 / 左下16,0 / 右下16,16）
+- 非表情类绘画用 pixel_rect 画大块
 - 多个工具调用在同一轮中完成

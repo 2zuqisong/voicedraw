@@ -8,6 +8,7 @@ pub mod grid;
 pub mod shapes;
 pub mod style_transfer;
 pub mod templates;
+pub mod emoji_patterns;
 
 pub use canvas_state::*;
 
