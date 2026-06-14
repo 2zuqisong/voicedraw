@@ -87,7 +87,8 @@ pub async fn process_command(
                         "success": true,
                         "message": result.message,
                         "canvas_state": result.canvas_state,
-                        "pending_plan": null
+                        "pending_plan": null,
+                        "pending_action": result.pending_action
                     }))
                 }
                 Ok(llm::scheduler::ProcessResult::PendingPlan { plan_json, message }) => {
@@ -161,7 +162,8 @@ pub async fn confirm_plan(app: tauri::AppHandle) -> Result<serde_json::Value, St
             Ok(serde_json::json!({
                 "success": true,
                 "message": result.message,
-                "canvas_state": result.canvas_state
+                "canvas_state": result.canvas_state,
+                "pending_action": result.pending_action
             }))
         }
         Err(e) => {
@@ -234,6 +236,41 @@ pub async fn modify_plan(new_text: String) -> Result<serde_json::Value, String> 
             }))
         }
     }
+}
+
+/// 前端调用：将捕获的 canvas 图像发送到 DashScope 进行风格转换
+#[tauri::command]
+pub async fn apply_style_transfer(
+    image_base64: String,
+    prompt: String,
+    node_ids: Vec<String>,
+) -> Result<serde_json::Value, String> {
+    log::info!(
+        "apply_style_transfer: prompt='{}', node_ids={:?}, image_len={}",
+        prompt,
+        node_ids,
+        image_base64.len()
+    );
+
+    let api_key = std::env::var("DASHSCOPE_API_KEY")
+        .map_err(|_| "未设置 DASHSCOPE_API_KEY 环境变量".to_string())?;
+
+    let result_image = crate::engine::style_transfer::apply_style_transfer(
+        &api_key,
+        &image_base64,
+        &prompt,
+    )
+    .await
+    .map_err(|e| {
+        log::error!("风格转换失败: {}", e);
+        format!("风格转换失败: {}", e)
+    })?;
+
+    Ok(serde_json::json!({
+        "success": true,
+        "image_base64": result_image,
+        "replaced_node_ids": node_ids
+    }))
 }
 
 fn execute_quick_action(
