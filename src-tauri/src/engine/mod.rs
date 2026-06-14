@@ -38,6 +38,7 @@ impl AppEngine {
             grid_size: 20.0,
             grid_origin_x: 40.0,
             grid_origin_y: 24.0,
+            pixel: None,
         };
         Self {
             canvas: Mutex::new(Some(default_canvas)),

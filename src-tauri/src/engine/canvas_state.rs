@@ -279,6 +279,19 @@ pub struct PendingAction {
     pub node_ids: Vec<String>,
 }
 
+/// 像素画布数据
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PixelCanvas {
+    /// "row,col" → hex color string（稀疏存储，只记有颜色的格子）
+    pub cells: HashMap<String, String>,
+    /// 每格像素大小
+    pub cell_size: u32,
+    /// 列数
+    pub cols: u32,
+    /// 行数
+    pub rows: u32,
+}
+
 /// Canvas 完整状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanvasState {
@@ -292,4 +305,7 @@ pub struct CanvasState {
     pub grid_size: f64,
     pub grid_origin_x: f64,
     pub grid_origin_y: f64,
+    /// 像素画布（仅像素模式使用）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pixel: Option<PixelCanvas>,
 }

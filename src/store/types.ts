@@ -123,6 +123,14 @@ export interface DiagramEdge {
   waypoints?: Position[] | null;
 }
 
+/** 像素画布数据（与 Rust PixelCanvas 对应） */
+export interface PixelCanvas {
+  cells: Record<string, string>; // "row,col" → hex
+  cell_size: number;
+  cols: number;
+  rows: number;
+}
+
 export interface CanvasState {
   id: string;
   title: string;
@@ -134,6 +142,8 @@ export interface CanvasState {
   grid_size: number;
   grid_origin_x: number;
   grid_origin_y: number;
+  /** 像素画布（像素模式使用） */
+  pixel?: PixelCanvas | null;
 }
 
 export interface NodeSummary {

@@ -233,6 +233,66 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                 "required": ["template"]
             }),
         ),
+        // ── 像素绘画工具 ─────────────────────────────────────────────
+        tool(
+            "pixel_set",
+            "设置像素格子颜色。用于在像素画布上画点、线或区域。可以一次设置多个格子，每个格子指定行列和颜色。颜色为 hex 格式如 #ff0000。不指定颜色则擦除该格子。",
+            json!({
+                "type": "object",
+                "properties": {
+                    "cells": {
+                        "type": "array",
+                        "description": "要设置的格子列表",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "row": {"type": "integer", "description": "行号（从0开始，上方为0）"},
+                                "col": {"type": "integer", "description": "列号（从0开始，左侧为0）"},
+                                "color": {"type": "string", "description": "hex 颜色如 #ff0000；不填则擦除"}
+                            },
+                            "required": ["row", "col"]
+                        }
+                    }
+                },
+                "required": ["cells"]
+            }),
+        ),
+        tool(
+            "pixel_fill",
+            "像素画布填充桶。将指定位置开始的连通区域填充为指定颜色。类似画图软件的油漆桶工具。",
+            json!({
+                "type": "object",
+                "properties": {
+                    "row": {"type": "integer", "description": "起始行号"},
+                    "col": {"type": "integer", "description": "起始列号"},
+                    "color": {"type": "string", "description": "填充颜色 hex，如 #ffffff"}
+                },
+                "required": ["row", "col", "color"]
+            }),
+        ),
+        tool(
+            "pixel_rect",
+            "在像素画布上画一个实心矩形。",
+            json!({
+                "type": "object",
+                "properties": {
+                    "row": {"type": "integer", "description": "矩形左上角行号"},
+                    "col": {"type": "integer", "description": "矩形左上角列号"},
+                    "width": {"type": "integer", "description": "矩形宽度（列数）"},
+                    "height": {"type": "integer", "description": "矩形高度（行数）"},
+                    "color": {"type": "string", "description": "填充颜色 hex，如 #ff0000"}
+                },
+                "required": ["row", "col", "width", "height", "color"]
+            }),
+        ),
+        tool(
+            "pixel_clear",
+            "清空像素画布上的所有内容。",
+            json!({
+                "type": "object",
+                "properties": {}
+            }),
+        ),
     ]
 }
 

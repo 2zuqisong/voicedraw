@@ -47,6 +47,7 @@ interface AppState {
   canvasMode: CanvasMode;
   pixel: PixelState;
   setCanvasMode: (mode: CanvasMode) => void;
+  _syncPixelFromCanvas: () => void;
   setPixelCell: (row: number, col: number, color: string | null) => void;
   setPixelColor: (color: string) => void;
   setPixelTool: (tool: PixelTool) => void;
@@ -144,6 +145,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   canvasMode: "vector",
   pixel: createDefaultPixel(),
   setCanvasMode: (mode) => set({ canvasMode: mode }),
+
+  /** 从 canvasState.pixel 同步到本地 Zustand（LLM 修改后触发） */
+  _syncPixelFromCanvas: () => {
+    const cs = get().canvasState;
+    if (!cs?.pixel) return;
+    const prev = get().pixel;
+    set({
+      pixel: {
+        ...prev,
+        data: { ...cs.pixel.cells },
+        cols: cs.pixel.cols,
+        rows: cs.pixel.rows,
+        cellSize: cs.pixel.cell_size,
+      },
+    });
+  },
 
   setPixelCell: (row, col, color) => {
     const { pixel } = get();
@@ -268,6 +285,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ].slice(-10), // 保留最近10条
         });
         get()._refreshSnapshotStatus();
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", lastOperation: result.message || "操作失败" });
       }
@@ -289,6 +307,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           status: "idle",
           lastOperation: result.message,
         });
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", lastOperation: result.message });
         setTimeout(() => set({ status: "idle" }), 2000);
@@ -317,6 +336,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             { role: "assistant" as const, content: result.message },
           ].slice(-10),
         });
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", pendingPlan: null, lastOperation: result.message || "执行失败" });
         setTimeout(() => set({ status: "idle" }), 3000);
@@ -349,6 +369,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           status: "idle",
           lastOperation: result.message,
         });
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", pendingPlan: null, lastOperation: result.message || "修改失败" });
         setTimeout(() => set({ status: "idle" }), 3000);
@@ -361,13 +382,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setStatus: (status) => set({ status }),
 
-  _updateCanvasState: (state) => set({ canvasState: state }),
+  _updateCanvasState: (state) => {
+    set({ canvasState: state });
+    get()._syncPixelFromCanvas();
+  },
 
   _initEventListener: async () => {
     // 监听 Rust 端推送的 canvas 更新事件
     await listen<CanvasState>("canvas-updated", (event) => {
       set({ canvasState: event.payload, status: "idle", pendingPlan: null });
       get()._refreshSnapshotStatus();
+      get()._syncPixelFromCanvas();
     });
   },
 }));

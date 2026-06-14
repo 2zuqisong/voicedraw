@@ -93,6 +93,7 @@ mod tests {
             grid_size: 20.0,
             grid_origin_x: 40.0,
             grid_origin_y: 24.0,
+            pixel: None,
         }
     }
 
