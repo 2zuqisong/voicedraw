@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { initFabricCanvas } from "../../lib/fabric-setup";
 import type { CanvasState, StyleTransferResult } from "../../store/types";
 import { useAppStore } from "../../store";
+import { getImageApiKey } from "../../lib/settings";
 import {
   renderBasicShape,
   renderCompositeShape,
@@ -214,7 +215,12 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
         // Step 3: 调用 Tauri command
         const result = await invoke<StyleTransferResult>(
           "apply_style_transfer",
-          { imageBase64: imageDataUrl, prompt, nodeIds },
+          {
+            imageBase64: imageDataUrl,
+            prompt,
+            nodeIds,
+            dashscopeKey: getImageApiKey(),
+          },
         );
 
         logStyleTransfer("风格转换完成，应用结果到画布...");

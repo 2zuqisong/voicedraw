@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan, PendingAction } from "./types";
+import { getLLMApiKey } from "../lib/settings";
 
 interface AppState {
   // 语音状态
@@ -67,7 +68,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   submitCommand: async (text) => {
     set({ status: "thinking", lastOperation: text });
     try {
-      const result = await invoke<OperationResult>("process_command", { text });
+      const result = await invoke<OperationResult>("process_command", { text, deepseekKey: getLLMApiKey() });
       if (result.pending_plan) {
         // 复杂指令：显示预览面板
         set({

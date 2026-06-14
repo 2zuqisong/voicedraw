@@ -16,6 +16,8 @@ static LLM_SCHEDULER: std::sync::LazyLock<Mutex<Option<llm::scheduler::LLMSchedu
 pub async fn process_command(
     text: String,
     app: tauri::AppHandle,
+    // 可选：前端传入的 DeepSeek API Key（优先于环境变量）
+    deepseek_key: Option<String>,
 ) -> Result<serde_json::Value, String> {
     log::info!("process_command: '{}'", text);
 
@@ -28,9 +30,11 @@ pub async fn process_command(
         }
         PreprocessResult::NeedsLLM { cleaned_text } => {
             log::info!("需要 LLM 处理: '{}'", cleaned_text);
-            // 从环境变量读取 API Key
-            let api_key = std::env::var("DEEPSEEK_API_KEY")
-                .unwrap_or_else(|_| "sk-placeholder".into());
+            // 优先使用前端传入的 key，其次用环境变量
+            let api_key = deepseek_key
+                .filter(|k| !k.is_empty())
+                .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
+                .unwrap_or_else(|| "sk-placeholder".into());
 
             // 用对话上下文丰富用户文本（代词消解）
             let enriched_text = {
@@ -244,6 +248,8 @@ pub async fn apply_style_transfer(
     image_base64: String,
     prompt: String,
     node_ids: Vec<String>,
+    // 可选：前端传入的 DashScope API Key（优先于环境变量）
+    dashscope_key: Option<String>,
 ) -> Result<serde_json::Value, String> {
     log::info!(
         "apply_style_transfer: prompt='{}', node_ids={:?}, image_len={}",
@@ -252,8 +258,10 @@ pub async fn apply_style_transfer(
         image_base64.len()
     );
 
-    let api_key = std::env::var("DASHSCOPE_API_KEY")
-        .map_err(|_| "未设置 DASHSCOPE_API_KEY 环境变量".to_string())?;
+    let api_key = dashscope_key
+        .filter(|k| !k.is_empty())
+        .or_else(|| std::env::var("DASHSCOPE_API_KEY").ok())
+        .ok_or_else(|| "未设置通义万相 API Key（请在设置面板填写或设置 DASHSCOPE_API_KEY 环境变量）".to_string())?;
 
     let result_image = crate::engine::style_transfer::apply_style_transfer(
         &api_key,
