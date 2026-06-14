@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as fabric from "fabric";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../../lib/apiBridge";
 import { initFabricCanvas } from "../../lib/fabric-setup";
 import type { CanvasState, StyleTransferResult } from "../../store/types";
 import { useAppStore } from "../../store";

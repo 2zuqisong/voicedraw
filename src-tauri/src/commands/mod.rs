@@ -4,12 +4,12 @@ use crate::llm;
 use std::sync::Mutex;
 use tauri::Emitter;
 
-// 全局 engine 实例
-static ENGINE: std::sync::LazyLock<AppEngine> =
+// 全局 engine 实例（与 http_server 共享）
+pub(crate) static ENGINE: std::sync::LazyLock<AppEngine> =
     std::sync::LazyLock::new(|| AppEngine::new());
 
 /// 全局 LLM 调度器（用于跨请求的 plan 缓存）
-static LLM_SCHEDULER: std::sync::LazyLock<Mutex<Option<llm::scheduler::LLMScheduler>>> =
+pub(crate) static LLM_SCHEDULER: std::sync::LazyLock<Mutex<Option<llm::scheduler::LLMScheduler>>> =
     std::sync::LazyLock::new(|| Mutex::new(None));
 
 #[tauri::command]
