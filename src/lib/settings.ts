@@ -191,6 +191,20 @@ export function getLLMApiKey(): string | undefined {
   return provider?.api_key || undefined;
 }
 
+/** 获取当前激活 LLM 厂商的 Endpoint */
+export function getLLMEndpoint(): string | undefined {
+  const s = loadSettings();
+  const provider = s.llm.providers[s.llm.active];
+  return provider?.endpoint || undefined;
+}
+
+/** 获取当前激活 LLM 厂商的 Model */
+export function getLLMModel(): string | undefined {
+  const s = loadSettings();
+  const provider = s.llm.providers[s.llm.active];
+  return provider?.model || undefined;
+}
+
 /** 获取当前激活图像厂商的 API Key */
 export function getImageApiKey(): string | undefined {
   const s = loadSettings();

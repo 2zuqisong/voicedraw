@@ -80,9 +80,9 @@ pub struct LLMScheduler {
 }
 
 impl LLMScheduler {
-    pub fn new(api_key: String) -> Self {
+    pub fn new(api_key: String, base_url: String, model: String) -> Self {
         Self {
-            client: DeepSeekClient::new(api_key, None),
+            client: DeepSeekClient::new(api_key, base_url, model),
             max_rounds: 5,
             plan_cache: None,
             cached_user_text: None,
