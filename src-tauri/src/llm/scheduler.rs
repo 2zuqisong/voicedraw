@@ -493,9 +493,12 @@ fn execute_tool_call(
 
                 let (sub_shapes, override_size) =
                     if crate::engine::shapes::is_composite(st) {
-                        crate::engine::shapes::get_composite_shapes(st)
-                            .map(|(shapes, w, h)| (Some(shapes), Some((w, h))))
-                            .unwrap_or((None, None))
+                        crate::engine::shapes::get_composite_shapes(
+                            st,
+                            args["fill"].as_str(),
+                        )
+                        .map(|(shapes, w, h)| (Some(shapes), Some((w, h))))
+                        .unwrap_or((None, None))
                     } else {
                         (None, None)
                     };
@@ -600,8 +603,9 @@ fn execute_tool_call(
                                         .unwrap_or(crate::engine::canvas_state::ShapeType::Rectangle),
                                 );
                                 if crate::engine::shapes::is_composite(st) {
+                                    let fill_opt = node_arg["fill"].as_str();
                                     if let Some((shapes, w, h)) =
-                                        crate::engine::shapes::get_composite_shapes(st)
+                                        crate::engine::shapes::get_composite_shapes(st, fill_opt)
                                     {
                                         n.sub_shapes = Some(shapes);
                                         n.size = crate::engine::canvas_state::Size { width: w, height: h };
@@ -635,12 +639,21 @@ fn execute_tool_call(
             let from = args["from"].as_str().ok_or("缺少 from")?;
             let to = args["to"].as_str().ok_or("缺少 to")?;
             let label = args["label"].as_str().map(|s| s.to_string());
+            let routing = args["routing"].as_str().unwrap_or("straight");
+            let edge_style = if routing == "orthogonal" {
+                Some(crate::engine::canvas_state::EdgeStyle {
+                    routing: crate::engine::canvas_state::RoutingMode::Orthogonal,
+                    ..Default::default()
+                })
+            } else {
+                None
+            };
             let edge = crate::engine::edge_ops::add_edge(
                 &mut state.edges,
                 from,
                 to,
                 label,
-                None,
+                edge_style,
             )
             .map_err(|e| format!("{}", e))?;
             Ok(serde_json::json!({"edge_id": edge.id}).to_string())
@@ -651,11 +664,22 @@ fn execute_tool_call(
                 .ok_or("edges 必须是数组")?;
             let batch: Vec<_> = edges
                 .iter()
-                .map(|e| crate::engine::edge_ops::EdgeDef {
-                    from: e["from"].as_str().unwrap_or("").to_string(),
-                    to: e["to"].as_str().unwrap_or("").to_string(),
-                    label: e["label"].as_str().map(|s| s.to_string()),
-                    style: None,
+                .map(|e| {
+                    let routing = e["routing"].as_str().unwrap_or("straight");
+                    let edge_style = if routing == "orthogonal" {
+                        Some(crate::engine::canvas_state::EdgeStyle {
+                            routing: crate::engine::canvas_state::RoutingMode::Orthogonal,
+                            ..Default::default()
+                        })
+                    } else {
+                        None
+                    };
+                    crate::engine::edge_ops::EdgeDef {
+                        from: e["from"].as_str().unwrap_or("").to_string(),
+                        to: e["to"].as_str().unwrap_or("").to_string(),
+                        label: e["label"].as_str().map(|s| s.to_string()),
+                        style: edge_style,
+                    }
                 })
                 .collect();
             let created =

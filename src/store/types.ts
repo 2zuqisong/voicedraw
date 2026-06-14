@@ -23,7 +23,17 @@ export type ShapeType =
   | "Sun"
   | "Tree"
   | "Smiley"
-  | "Star";
+  | "Star"
+  | "Cake"
+  | "Gift"
+  | "Balloon"
+  | "Candle"
+  | "Heart"
+  | "Flower"
+  | "ArrowShape"
+  | "SpeechBubble"
+  | "Cloud"
+  | "Lightning";
 
 export type Theme =
   | "Default"
@@ -34,6 +44,7 @@ export type Theme =
 
 export type LineStyle = "Solid" | "Dashed" | "Dotted";
 export type ArrowType = "Single" | "Double" | "None";
+export type RoutingMode = "Straight" | "Orthogonal";
 export type AppStatus = "idle" | "listening" | "thinking" | "executing" | "error";
 
 export interface Position {
@@ -85,6 +96,7 @@ export interface SubShape {
 export interface EdgeStyle {
   line_style: LineStyle;
   arrow: ArrowType;
+  routing: RoutingMode;
   stroke: string;
   stroke_width: number;
 }
@@ -108,6 +120,7 @@ export interface DiagramEdge {
   to_id: string;
   label: string | null;
   style: EdgeStyle;
+  waypoints?: Position[] | null;
 }
 
 export interface CanvasState {

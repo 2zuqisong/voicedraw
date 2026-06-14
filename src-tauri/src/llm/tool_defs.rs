@@ -22,7 +22,7 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                                 },
                                 "shape_type": {
                                     "type": "string",
-                                    "enum": ["circle", "rectangle", "triangle", "line", "dot", "house", "sun", "tree", "smiley", "star"],
+                                    "enum": ["circle", "rectangle", "triangle", "line", "dot", "house", "sun", "tree", "smiley", "star", "cake", "gift", "balloon", "candle", "heart", "flower", "arrow_shape", "speech_bubble", "cloud", "lightning"],
                                     "description": "几何图形类型（与 type 二选一，画几何图形时用此字段）"
                                 },
                                 "label": {
@@ -58,7 +58,8 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                             "properties": {
                                 "from": {"type": "string", "description": "起始节点 ID"},
                                 "to": {"type": "string", "description": "目标节点 ID"},
-                                "label": {"type": "string", "description": "连线标签（可选）"}
+                                "label": {"type": "string", "description": "连线标签（可选）"},
+                                "routing": {"type": "string", "enum": ["straight", "orthogonal"], "description": "路由模式：straight=直线，orthogonal=直角折线"}
                             },
                             "required": ["from", "to"]
                         }
@@ -74,7 +75,7 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                 "type": "object",
                 "properties": {
                     "type": {"type": "string", "enum": ["start", "end", "process", "decision", "data", "subprocess", "text"], "description": "流程图节点类型（与 shape_type 二选一）"},
-                    "shape_type": {"type": "string", "enum": ["circle", "rectangle", "triangle", "line", "dot", "house", "sun", "tree", "smiley", "star"], "description": "几何图形类型（与 type 二选一，画几何图形时用此字段）"},
+                    "shape_type": {"type": "string", "enum": ["circle", "rectangle", "triangle", "line", "dot", "house", "sun", "tree", "smiley", "star", "cake", "gift", "balloon", "candle", "heart", "flower", "arrow_shape", "speech_bubble", "cloud", "lightning"], "description": "几何图形类型（与 type 二选一，画几何图形时用此字段）"},
                     "label": {"type": "string"},
                     "position": {
                         "type": "object",
@@ -103,7 +104,8 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                 "properties": {
                     "from": {"type": "string"},
                     "to": {"type": "string"},
-                    "label": {"type": "string"}
+                    "label": {"type": "string"},
+                    "routing": {"type": "string", "enum": ["straight", "orthogonal"], "description": "路由模式"}
                 },
                 "required": ["from", "to"]
             }),

@@ -542,7 +542,7 @@ function renderNode(
   canvas.add(group);
 }
 
-/** 渲染单条连线（含箭头） */
+/** 渲染单条连线（含箭头），支持直线和正交路由 */
 function renderEdge(
   canvas: fabric.Canvas,
   edge: CanvasState["edges"][string],
@@ -561,11 +561,10 @@ function renderEdge(
   const dx = toCX - fromCX;
   const dy = toCY - fromCY;
 
-  // 根据两节点相对位置选择最佳的连接点（边的中点）
+  // 根据两节点相对位置选择最佳的连接点
   let fromX: number, fromY: number, toX: number, toY: number;
 
   if (Math.abs(dx) > Math.abs(dy)) {
-    // 水平方向为主：从左节点的右边 → 右节点的左边
     if (dx > 0) {
       fromX = fromNode.position.x + fromNode.size.width;
       fromY = fromCY;
@@ -578,7 +577,6 @@ function renderEdge(
       toY = toCY;
     }
   } else {
-    // 垂直方向为主：从上节点的下边 → 下节点的上边
     if (dy > 0) {
       fromX = fromCX;
       fromY = fromNode.position.y + fromNode.size.height;
@@ -599,44 +597,116 @@ function renderEdge(
         ? [2, 4]
         : undefined;
 
-  const line = new fabric.Line([fromX, fromY, toX, toY], {
-    stroke: edge.style.stroke,
-    strokeWidth: edge.style.stroke_width,
-    strokeDashArray: dashArray,
-  });
-  (line as any).data = { edgeId: edge.id };
-  canvas.add(line);
+  const isOrthogonal = edge.style.routing === "Orthogonal";
 
-  // 箭头（三角形）
-  const angle = Math.atan2(toY - fromY, toX - fromX);
-  const arrowSize = 10;
-  const arrow = new fabric.Triangle({
-    left: toX,
-    top: toY,
-    width: arrowSize * 2,
-    height: arrowSize * 1.6,
-    fill: edge.style.stroke,
-    angle: (angle * 180) / Math.PI + 90,
-    originX: "center",
-    originY: "center",
-    selectable: false,
-    evented: false,
-  });
-  (arrow as any).data = { edgeId: edge.id, isArrow: true };
-  canvas.add(arrow);
+  if (isOrthogonal) {
+    // 正交路由：L 形折线
+    const isHorizontal = Math.abs(dx) > Math.abs(dy);
+    let xyPoints: { x: number; y: number }[];
+    if (isHorizontal) {
+      const midX = (fromX + toX) / 2;
+      xyPoints = [
+        { x: fromX, y: fromY },
+        { x: midX, y: fromY },
+        { x: midX, y: toY },
+        { x: toX, y: toY },
+      ];
+    } else {
+      const midY = (fromY + toY) / 2;
+      xyPoints = [
+        { x: fromX, y: fromY },
+        { x: fromX, y: midY },
+        { x: toX, y: midY },
+        { x: toX, y: toY },
+      ];
+    }
 
-  if (edge.label) {
-    const label = new fabric.Textbox(edge.label, {
-      left: (fromX + toX) / 2,
-      top: (fromY + toY) / 2 - 16,
-      fontSize: 11,
-      fill: "#555555",
-      originX: "center",
-      originY: "bottom",
-      textAlign: "center",
-      splitByGrapheme: true,
+    const polyline = new fabric.Polyline(xyPoints, {
+      stroke: edge.style.stroke,
+      strokeWidth: edge.style.stroke_width,
+      strokeDashArray: dashArray,
+      fill: "transparent",
     });
-    canvas.add(label);
+    (polyline as any).data = { edgeId: edge.id };
+    canvas.add(polyline);
+
+    // Arrow angle from the LAST segment
+    const segStart = xyPoints[xyPoints.length - 2];
+    const angle = Math.atan2(toY - segStart.y, toX - segStart.x);
+    const arrowSize = 10;
+    const arrow = new fabric.Triangle({
+      left: toX,
+      top: toY,
+      width: arrowSize * 2,
+      height: arrowSize * 1.6,
+      fill: edge.style.stroke,
+      angle: (angle * 180) / Math.PI + 90,
+      originX: "center",
+      originY: "center",
+      selectable: false,
+      evented: false,
+    });
+    (arrow as any).data = { edgeId: edge.id, isArrow: true };
+    canvas.add(arrow);
+
+    // Label on the middle segment
+    if (edge.label) {
+      const midSegStart = xyPoints[1];
+      const midSegEnd = xyPoints[2];
+      const labelX = (midSegStart.x + midSegEnd.x) / 2;
+      const labelY = (midSegStart.y + midSegEnd.y) / 2 - 12;
+      const label = new fabric.Textbox(edge.label, {
+        left: labelX,
+        top: labelY,
+        fontSize: 11,
+        fill: "#555555",
+        originX: "center",
+        originY: "bottom",
+        textAlign: "center",
+        splitByGrapheme: true,
+      });
+      canvas.add(label);
+    }
+  } else {
+    // 直线模式（默认）
+    const line = new fabric.Line([fromX, fromY, toX, toY], {
+      stroke: edge.style.stroke,
+      strokeWidth: edge.style.stroke_width,
+      strokeDashArray: dashArray,
+    });
+    (line as any).data = { edgeId: edge.id };
+    canvas.add(line);
+
+    const angle = Math.atan2(toY - fromY, toX - fromX);
+    const arrowSize = 10;
+    const arrow = new fabric.Triangle({
+      left: toX,
+      top: toY,
+      width: arrowSize * 2,
+      height: arrowSize * 1.6,
+      fill: edge.style.stroke,
+      angle: (angle * 180) / Math.PI + 90,
+      originX: "center",
+      originY: "center",
+      selectable: false,
+      evented: false,
+    });
+    (arrow as any).data = { edgeId: edge.id, isArrow: true };
+    canvas.add(arrow);
+
+    if (edge.label) {
+      const label = new fabric.Textbox(edge.label, {
+        left: (fromX + toX) / 2,
+        top: (fromY + toY) / 2 - 16,
+        fontSize: 11,
+        fill: "#555555",
+        originX: "center",
+        originY: "bottom",
+        textAlign: "center",
+        splitByGrapheme: true,
+      });
+      canvas.add(label);
+    }
   }
 }
 
