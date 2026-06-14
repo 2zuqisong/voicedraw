@@ -95,7 +95,3 @@ src-tauri/src/           # Rust 后端
 ├── preprocessor/         # 文本预处理
 └── http_server.rs        # HTTP API
 ```
-
-## License
-
-MIT

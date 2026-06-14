@@ -69,6 +69,7 @@ export default function TopBar() {
           background: "var(--surface, #fff)",
           border: "1px solid var(--border, #d4d4ce)",
           borderRadius: "var(--radius, 6px)",
+          boxShadow: "0 1px 8px rgba(0,0,0,0.08)",
           overflow: "hidden",
           userSelect: "none",
         }}
