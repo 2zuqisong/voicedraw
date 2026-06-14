@@ -133,41 +133,26 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
     if (pendingAction.action_type !== "apply_style") return;
 
     pendingActionRef.current = true;
-    logStyleTransfer("开始捕获画布图像...", pendingAction.prompt);
 
-    // Step 1: 捕获 canvas 为 PNG base64
-    const dataUrl = canvas.toDataURL({
-      format: "png",
-      multiplier: 1,
-    });
+    const isNodeMode = pendingAction.node_ids.length > 0;
+    const nodeIds = pendingAction.node_ids;
 
-    logStyleTransfer("正在调用 DashScope 风格转换 API...");
-
-    // Step 2: 调用 Tauri command
-    invoke<StyleTransferResult>("apply_style_transfer", {
-      imageBase64: dataUrl,
-      prompt: pendingAction.prompt,
-      nodeIds: pendingAction.node_ids,
-    })
-      .then((result) => {
-        logStyleTransfer("风格转换完成，应用结果到画布...");
-
-        // Step 3: 记录目标节点的包围盒，然后移除
+    // Async IIFE: cropCanvasRegion is Promise-based
+    (async () => {
+      try {
+        // Step 1: 确定目标包围盒 + 待移除的对象
         let targetBounds = { left: 40, top: 24, width: 200, height: 200 };
         let foundBounds = false;
+        const toRemove: fabric.Object[] = [];
 
-        if (result.replaced_node_ids.length > 0) {
+        if (isNodeMode) {
           let minX = Infinity,
             minY = Infinity,
             maxX = -Infinity,
             maxY = -Infinity;
-          const toRemove: fabric.Object[] = [];
           canvas.getObjects().forEach((obj) => {
             const data = (obj as any).data;
-            if (
-              data?.nodeId &&
-              result.replaced_node_ids.includes(data.nodeId)
-            ) {
+            if (data?.nodeId && nodeIds.includes(data.nodeId)) {
               const bounds = obj.getBoundingRect();
               minX = Math.min(minX, bounds.left);
               minY = Math.min(minY, bounds.top);
@@ -176,8 +161,6 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
               toRemove.push(obj);
             }
           });
-          toRemove.forEach((obj) => canvas.remove(obj));
-
           if (isFinite(minX)) {
             targetBounds = {
               left: minX - 16,
@@ -188,7 +171,6 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
             foundBounds = true;
           }
         } else {
-          // 整画布模式：包围盒覆盖所有非网格对象
           let minX = Infinity,
             minY = Infinity,
             maxX = -Infinity,
@@ -200,6 +182,7 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
             minY = Math.min(minY, bounds.top);
             maxX = Math.max(maxX, bounds.left + bounds.width);
             maxY = Math.max(maxY, bounds.top + bounds.height);
+            toRemove.push(obj);
           });
           if (isFinite(minX)) {
             targetBounds = {
@@ -209,18 +192,39 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
               height: maxY - minY,
             };
             foundBounds = true;
-            // 移除所有非网格对象
-            const toRemove: fabric.Object[] = [];
-            canvas.getObjects().forEach((obj) => {
-              if (!(obj as any).isGridLine) toRemove.push(obj);
-            });
-            toRemove.forEach((obj) => canvas.remove(obj));
           }
         }
 
-        // Step 4: 将结果图片放到原节点位置
-        fabric.FabricImage.fromURL(result.image_base64).then((img) => {
-          if (!img) return;
+        // Step 2: 获取图像 — 节点模式裁剪，画布模式全图
+        const imageDataUrl =
+          isNodeMode && foundBounds
+            ? await cropCanvasRegion(canvas, targetBounds)
+            : canvas.toDataURL({ format: "png", multiplier: 2 });
+
+        const logLabel = isNodeMode
+          ? `${nodeIds.length} 个节点 (${Math.round(targetBounds.width)}×${Math.round(targetBounds.height)}px)`
+          : "整个画布";
+        logStyleTransfer(`正在调用 API (${logLabel})...`, pendingAction.prompt);
+
+        // 节点模式：prompt 追加作用域约束
+        const prompt = isNodeMode
+          ? `${pendingAction.prompt}\n仅对选中对象进行风格转换。禁止修改未选中区域。禁止改变画布背景。禁止新增任何元素。严格保持对象轮廓和比例不变。`
+          : pendingAction.prompt;
+
+        // Step 3: 调用 Tauri command
+        const result = await invoke<StyleTransferResult>(
+          "apply_style_transfer",
+          { imageBase64: imageDataUrl, prompt, nodeIds },
+        );
+
+        logStyleTransfer("风格转换完成，应用结果到画布...");
+
+        // Step 4: 移除旧对象
+        toRemove.forEach((obj) => canvas.remove(obj));
+
+        // Step 5: 贴回结果图片
+        const img = await fabric.FabricImage.fromURL(result.image_base64);
+        if (img) {
           const imgW = img.width!;
           const imgH = img.height!;
           const scaleX = targetBounds.width / imgW;
@@ -246,21 +250,20 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
           canvas.add(img);
           canvas.requestRenderAll();
           logStyleTransfer("风格转换完成！");
-        });
+        }
 
-        // 清理
         clearPendingAction();
         setStatus("idle");
         pendingActionRef.current = false;
-      })
-      .catch((err) => {
+      } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logStyleTransfer(`风格转换失败: ${msg}`);
         clearPendingAction();
         setStatus("error");
         pendingActionRef.current = false;
         setTimeout(() => setStatus("idle"), 3000);
-      });
+      }
+    })();
   }, [pendingAction, clearPendingAction, setStatus]);
 
   return (
@@ -607,4 +610,55 @@ function logStyleTransfer(message: string, detail?: string) {
   } else {
     console.log(`${prefix} ${message}`);
   }
+}
+
+/** DashScope API 最小尺寸要求 */
+const MIN_API_IMAGE_SIZE = 512;
+
+/** 从 Fabric.js canvas 中裁剪指定区域为独立 PNG（base64 data URL）。
+ *  小图自动等比放大至不低于 512px，满足 DashScope API 最低尺寸。 */
+function cropCanvasRegion(
+  canvas: fabric.Canvas,
+  bounds: { left: number; top: number; width: number; height: number },
+): Promise<string> {
+  const fullDataUrl = canvas.toDataURL({
+    format: "png",
+    multiplier: 2,
+  });
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = Math.round(bounds.width);
+      const h = Math.round(bounds.height);
+
+      // 如果尺寸小于 API 要求，等比放大
+      const minDim = Math.min(w, h);
+      const scale = minDim < MIN_API_IMAGE_SIZE
+        ? MIN_API_IMAGE_SIZE / minDim
+        : 1;
+
+      const offscreen = document.createElement("canvas");
+      offscreen.width = Math.round(w * scale);
+      offscreen.height = Math.round(h * scale);
+      const ctx = offscreen.getContext("2d")!;
+
+      // 高质量缩放
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(
+        img,
+        bounds.left,
+        bounds.top,
+        bounds.width,
+        bounds.height,
+        0,
+        0,
+        offscreen.width,
+        offscreen.height,
+      );
+      resolve(offscreen.toDataURL("image/png"));
+    };
+    img.src = fullDataUrl;
+  });
 }
