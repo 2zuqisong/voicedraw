@@ -14,57 +14,72 @@ function isSpeechSupported(): boolean {
 export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
   const { onResult, onError, onEnd, lang = "zh-CN" } = options;
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // 防重入：连续快速点击时忽略
+  const activeRef = useRef(false);
 
   const start = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      onError("浏览器不支持语音识别，请使用 Chrome 浏览器。");
-      return;
+    if (activeRef.current) return;
+    activeRef.current = true;
+
+    // 复用已有实例，避免重复创建 → 省去麦克风重新初始化延迟
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch {
+        // 实例可能已过期，重建
+        recognitionRef.current = null;
+      }
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = lang;
-    recognition.interimResults = true;
-    recognition.continuous = true;
-    recognition.maxAlternatives = 1;
+    if (!recognitionRef.current) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        activeRef.current = false;
+        onError("浏览器不支持语音识别，请使用 Chrome 浏览器。");
+        return;
+      }
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      // 从 0 遍历全部累积结果（而非 event.resultIndex），确保停顿前后的
-      // 语音内容被完整拼接，不会因中途暂停而被覆盖。
-      let transcript = "";
-      let isFinal = false;
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          isFinal = true;
+      const recognition = new SpeechRecognition();
+      recognition.lang = lang;
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let transcript = "";
+        let isFinal = false;
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+          if (event.results[i].isFinal) isFinal = true;
         }
-      }
-      onResult(transcript, isFinal);
-    };
+        onResult(transcript, isFinal);
+      };
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      // 'no-speech' 和 'aborted' 是正常结束，不算错误
-      if (event.error !== "no-speech" && event.error !== "aborted") {
-        onError(`语音识别错误: ${event.error}`);
-      }
-    };
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        if (event.error !== "no-speech" && event.error !== "aborted") {
+          onError(`语音识别错误: ${event.error}`);
+        }
+      };
 
-    recognition.onend = () => {
-      onEnd();
-    };
+      recognition.onend = () => {
+        activeRef.current = false;
+        onEnd();
+      };
 
-    recognition.start();
-    recognitionRef.current = recognition;
+      recognitionRef.current = recognition;
+      recognition.start();
+    }
   }, [lang, onResult, onError, onEnd]);
 
   const stop = useCallback(() => {
+    activeRef.current = false;
     if (recognitionRef.current) {
       recognitionRef.current.stop();
-      recognitionRef.current = null;
     }
   }, []);
 
   const abort = useCallback(() => {
+    activeRef.current = false;
     if (recognitionRef.current) {
       recognitionRef.current.abort();
       recognitionRef.current = null;
