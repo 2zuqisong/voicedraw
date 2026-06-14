@@ -16,8 +16,9 @@ static LLM_SCHEDULER: std::sync::LazyLock<Mutex<Option<llm::scheduler::LLMSchedu
 pub async fn process_command(
     text: String,
     app: tauri::AppHandle,
-    // 可选：前端传入的 DeepSeek API Key（优先于环境变量）
-    deepseek_key: Option<String>,
+    llm_api_key: Option<String>,
+    llm_endpoint: Option<String>,
+    llm_model: Option<String>,
 ) -> Result<serde_json::Value, String> {
     log::info!("process_command: '{}'", text);
 
@@ -31,10 +32,16 @@ pub async fn process_command(
         PreprocessResult::NeedsLLM { cleaned_text } => {
             log::info!("需要 LLM 处理: '{}'", cleaned_text);
             // 优先使用前端传入的 key，其次用环境变量
-            let api_key = deepseek_key
+            let api_key = llm_api_key
                 .filter(|k| !k.is_empty())
                 .or_else(|| std::env::var("DEEPSEEK_API_KEY").ok())
                 .unwrap_or_else(|| "sk-placeholder".into());
+            let endpoint = llm_endpoint
+                .filter(|e| !e.is_empty())
+                .unwrap_or_else(|| "https://api.deepseek.com".into());
+            let model = llm_model
+                .filter(|m| !m.is_empty())
+                .unwrap_or_else(|| "deepseek-chat".into());
 
             // 用对话上下文丰富用户文本（代词消解）
             let enriched_text = {
@@ -57,7 +64,9 @@ pub async fn process_command(
             let mut scheduler = {
                 let mut guard = LLM_SCHEDULER.lock().unwrap();
                 if guard.is_none() {
-                    *guard = Some(llm::scheduler::LLMScheduler::new(api_key));
+                    *guard = Some(llm::scheduler::LLMScheduler::new(
+                        api_key, endpoint, model,
+                    ));
                 }
                 guard.take().unwrap()
             };
@@ -333,5 +342,15 @@ fn execute_quick_action(
         "success": true,
         "message": message,
         "canvas_state": state
+    }))
+}
+
+/// 查询快照状态（undo/redo 是否可用）
+#[tauri::command]
+pub fn get_snapshot_status() -> Result<serde_json::Value, String> {
+    let snapshots = ENGINE.snapshots.lock().unwrap();
+    Ok(serde_json::json!({
+        "can_undo": snapshots.can_undo(),
+        "can_redo": snapshots.can_redo(),
     }))
 }

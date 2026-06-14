@@ -11,6 +11,8 @@ export default function VoiceBar() {
   const setStatus = useAppStore((s) => s.setStatus);
   const submitCommand = useAppStore((s) => s.submitCommand);
   const quickAction = useAppStore((s) => s.quickAction);
+const canUndo = useAppStore((s) => s.canUndo);
+const canRedo = useAppStore((s) => s.canRedo);
 
   const lastTextRef = useRef("");
   const [draftText, setDraftText] = useState("");
@@ -88,19 +90,19 @@ export default function VoiceBar() {
       <div style={{ display: "flex", gap: 6 }}>
         <button
           onClick={() => quickAction("undo")}
-          disabled={status !== "idle"}
+          disabled={status !== "idle" || !canUndo}
           className="btn-ghost"
-          style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}
-          title="撤销"
+          style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, opacity: canUndo ? 1 : 0.3 }}
+          title={canUndo ? "撤销" : "没有可撤销的操作"}
         >
           ↺
         </button>
         <button
           onClick={() => quickAction("redo")}
-          disabled={status !== "idle"}
+          disabled={status !== "idle" || !canRedo}
           className="btn-ghost"
-          style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}
-          title="重做"
+          style={{ width: btnSize, height: btnSize, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, opacity: canRedo ? 1 : 0.3 }}
+          title={canRedo ? "重做" : "没有可重做的操作"}
         >
           ↻
         </button>

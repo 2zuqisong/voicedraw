@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan, PendingAction } from "./types";
-import { getLLMApiKey } from "../lib/settings";
+import { getLLMApiKey, getLLMEndpoint, getLLMModel } from "../lib/settings";
 
 interface AppState {
   // 语音状态
@@ -39,6 +39,11 @@ interface AppState {
   quickAction: (action: string) => Promise<void>;
   setStatus: (status: AppStatus) => void;
 
+  // Undo/Redo 可用性
+  canUndo: boolean;
+  canRedo: boolean;
+  _refreshSnapshotStatus: () => Promise<void>;
+
   // 内部
   _updateCanvasState: (state: CanvasState) => void;
   _initEventListener: () => Promise<void>;
@@ -56,6 +61,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearPendingAction: () => set({ pendingAction: null }),
   exportFormat: null,
   clearExport: () => set({ exportFormat: null }),
+  canUndo: false,
+  canRedo: false,
+  _refreshSnapshotStatus: async () => {
+    try {
+      const status = await invoke<{ can_undo: boolean; can_redo: boolean }>("get_snapshot_status");
+      set({ canUndo: status.can_undo, canRedo: status.can_redo });
+    } catch { /* 忽略 */ }
+  },
 
   startListening: () => set({ isListening: true, status: "listening", transcript: "" }),
   
@@ -74,7 +87,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   submitCommand: async (text) => {
     set({ status: "thinking", lastOperation: text });
     try {
-      const result = await invoke<OperationResult>("process_command", { text, deepseekKey: getLLMApiKey() });
+      const result = await invoke<OperationResult>("process_command", {
+        text,
+        llmApiKey: getLLMApiKey(),
+        llmEndpoint: getLLMEndpoint(),
+        llmModel: getLLMModel(),
+      });
       // 检测导出快捷操作
       if (result.message && result.message.includes("快捷操作: export")) {
         const fmt = text.includes("SVG") || text.includes("svg") ? "svg" : "png";
@@ -111,6 +129,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             { role: "assistant" as const, content: result.message },
           ].slice(-10), // 保留最近10条
         });
+        get()._refreshSnapshotStatus();
       } else {
         set({ status: "error", lastOperation: result.message || "操作失败" });
       }
@@ -210,6 +229,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     // 监听 Rust 端推送的 canvas 更新事件
     await listen<CanvasState>("canvas-updated", (event) => {
       set({ canvasState: event.payload, status: "idle", pendingPlan: null });
+      get()._refreshSnapshotStatus();
     });
   },
 }));
