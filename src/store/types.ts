@@ -123,6 +123,7 @@ export interface OperationResult {
   message: string;
   canvas_state: CanvasState | null;
   pending_plan: OperationPlan | null;
+  pending_action: PendingAction | null;
 }
 
 /** 操作计划（预览确认用） */

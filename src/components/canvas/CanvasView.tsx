@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import * as fabric from "fabric";
+import { invoke } from "@tauri-apps/api/core";
 import { initFabricCanvas } from "../../lib/fabric-setup";
-import type { CanvasState } from "../../store/types";
+import type { CanvasState, StyleTransferResult } from "../../store/types";
+import { useAppStore } from "../../store";
 import {
   renderBasicShape,
   renderCompositeShape,
@@ -117,6 +119,86 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
       renderCanvasState(canvas, canvasState);
     }
   }, [canvasState]);
+
+  // 检测 pendingAction（如风格转换），执行前端侧操作
+  const pendingAction = useAppStore((s) => s.pendingAction);
+  const clearPendingAction = useAppStore((s) => s.clearPendingAction);
+  const setStatus = useAppStore((s) => s.setStatus);
+  const pendingActionRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas || !pendingAction || pendingActionRef.current) return;
+
+    if (pendingAction.action_type !== "apply_style") return;
+
+    pendingActionRef.current = true;
+    logStyleTransfer("开始捕获画布图像...", pendingAction.prompt);
+
+    // Step 1: 捕获 canvas 为 PNG base64
+    const dataUrl = canvas.toDataURL({
+      format: "png",
+      multiplier: 1,
+    });
+
+    logStyleTransfer("正在调用 DashScope 风格转换 API...");
+
+    // Step 2: 调用 Tauri command
+    invoke<StyleTransferResult>("apply_style_transfer", {
+      imageBase64: dataUrl,
+      prompt: pendingAction.prompt,
+      nodeIds: pendingAction.node_ids,
+    })
+      .then((result) => {
+        logStyleTransfer("风格转换完成，应用结果到画布...");
+
+        // Step 3: 移除目标节点
+        if (result.replaced_node_ids.length > 0) {
+          const toRemove: fabric.Object[] = [];
+          canvas.getObjects().forEach((obj) => {
+            const data = (obj as any).data;
+            if (
+              data?.nodeId &&
+              result.replaced_node_ids.includes(data.nodeId)
+            ) {
+              toRemove.push(obj);
+            }
+          });
+          toRemove.forEach((obj) => canvas.remove(obj));
+        }
+
+        // Step 4: 将结果图片贴到画布
+        fabric.FabricImage.fromURL(result.image_base64).then((img) => {
+          if (!img) return;
+          img.set({
+            left: 40,
+            top: 24,
+            selectable: true,
+            evented: true,
+          });
+          (img as any).data = {
+            nodeId: `styled_${Date.now()}`,
+            isStyledImage: true,
+          };
+          canvas.add(img);
+          canvas.requestRenderAll();
+          logStyleTransfer("风格转换完成！");
+        });
+
+        // 清理
+        clearPendingAction();
+        setStatus("idle");
+        pendingActionRef.current = false;
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        logStyleTransfer(`风格转换失败: ${msg}`);
+        clearPendingAction();
+        setStatus("error");
+        pendingActionRef.current = false;
+        setTimeout(() => setStatus("idle"), 3000);
+      });
+  }, [pendingAction, clearPendingAction, setStatus]);
 
   return (
     <div
@@ -451,5 +533,15 @@ function renderEdge(
       backgroundColor: "#fafafa",
     });
     canvas.add(label);
+  }
+}
+
+/** 风格转换流程日志（开发调试用） */
+function logStyleTransfer(message: string, detail?: string) {
+  const prefix = "[风格转换]";
+  if (detail) {
+    console.log(`${prefix} ${message}`, detail);
+  } else {
+    console.log(`${prefix} ${message}`);
   }
 }
