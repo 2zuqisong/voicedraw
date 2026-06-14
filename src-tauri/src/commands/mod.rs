@@ -72,7 +72,22 @@ pub async fn process_command(
                 guard.take().unwrap()
             };
 
-            let result = scheduler.process(&enriched_text, &history, &ENGINE, canvas_mode.as_deref()).await;
+            // 创建进度通道：LLM 每轮工具调用后推送中间画布状态
+            let (progress_tx, mut progress_rx) = tokio::sync::mpsc::unbounded_channel::<serde_json::Value>();
+            let app_handle = app.clone();
+            let progress_task = tokio::spawn(async move {
+                while let Some(state) = progress_rx.recv().await {
+                    let _ = app_handle.emit("canvas-progress", &state);
+                }
+            });
+
+            let result = scheduler.process_with_progress(
+                &enriched_text, &history, &ENGINE,
+                canvas_mode.as_deref(), Some(progress_tx),
+            ).await;
+
+            // 等待进度事件发送完毕
+            progress_task.abort();
 
             // 将 scheduler 放回全局
             *LLM_SCHEDULER.lock().unwrap() = Some(scheduler);
@@ -344,6 +359,15 @@ fn execute_quick_action(
         "message": message,
         "canvas_state": state
     }))
+}
+
+/// 切换模式时清除对话上下文，防止跨模式信息泄露
+#[tauri::command]
+pub fn reset_context() -> Result<serde_json::Value, String> {
+    let mut ctx = ENGINE.context.lock().unwrap();
+    ctx.clear();
+    log::info!("对话上下文已清除");
+    Ok(serde_json::json!({"success": true}))
 }
 
 /// 查询快照状态（undo/redo 是否可用）

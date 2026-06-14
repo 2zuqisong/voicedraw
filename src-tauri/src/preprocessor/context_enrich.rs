@@ -19,6 +19,11 @@ impl ConversationContext {
         Self { turns: Vec::new() }
     }
 
+    /// 清空所有对话历史
+    pub fn clear(&mut self) {
+        self.turns.clear();
+    }
+
     /// 添加一轮对话
     pub fn add_turn(&mut self, user: String, assistant: String, nodes: Vec<String>) {
         self.turns.push(ConversationTurn {

@@ -100,6 +100,18 @@ impl LLMScheduler {
         engine: &AppEngine,
         canvas_mode: Option<&str>,
     ) -> Result<ProcessResult, String> {
+        self.process_with_progress(user_text, history, engine, canvas_mode, None).await
+    }
+
+    /// 处理用户指令 + 可选进度推送
+    pub async fn process_with_progress(
+        &mut self,
+        user_text: &str,
+        history: &[(String, String)],
+        engine: &AppEngine,
+        canvas_mode: Option<&str>,
+        progress_tx: Option<tokio::sync::mpsc::UnboundedSender<serde_json::Value>>,
+    ) -> Result<ProcessResult, String> {
         if let Some(mode) = canvas_mode {
             self.canvas_mode = Some(mode.to_string());
         }
@@ -109,7 +121,16 @@ impl LLMScheduler {
             history.len() / 2
         );
 
-        // 1. 复杂度判断
+        // 1. 复杂度判断 — 像素模式或简单关键词直接跳过 LLM 调用
+        let is_pixel = self.canvas_mode.as_deref() == Some("pixel");
+        let is_simple_keyword = is_simple_command(user_text);
+
+        if is_pixel || is_simple_keyword {
+            log::info!("跳过复杂度判断（{}），直接执行", if is_pixel { "像素模式" } else { "简单指令" });
+            let result = self.execute_full_with_progress(user_text, history, engine, progress_tx.clone()).await?;
+            return Ok(ProcessResult::Executed(result));
+        }
+
         let complexity = self.judge_complexity(user_text).await?;
         log::info!(
             "复杂度判断: {} (预估 {} 个工具调用)",
@@ -118,7 +139,6 @@ impl LLMScheduler {
         );
 
         if complexity.0 == "complex" && complexity.2 > 3 {
-            // 复杂指令：生成计划节点 → 等待用户确认
             let nodes = self.generate_plan_nodes(user_text).await?;
             let plan = OperationPlan {
                 id: uuid::Uuid::new_v4().to_string(),
@@ -147,7 +167,6 @@ impl LLMScheduler {
             });
         }
 
-        // 简单指令：沿用现有多轮执行逻辑
         let result = self.execute_full(user_text, history, engine).await?;
         Ok(ProcessResult::Executed(result))
     }
@@ -259,6 +278,17 @@ impl LLMScheduler {
         history: &[(String, String)],
         engine: &AppEngine,
     ) -> Result<SchedulerResult, String> {
+        self.execute_full_with_progress(user_text, history, engine, None).await
+    }
+
+    /// 完整执行 + 每轮后推送中间画布状态
+    async fn execute_full_with_progress(
+        &self,
+        user_text: &str,
+        history: &[(String, String)],
+        engine: &AppEngine,
+        progress_tx: Option<tokio::sync::mpsc::UnboundedSender<serde_json::Value>>,
+    ) -> Result<SchedulerResult, String> {
         let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
 
         // 1. System prompt — 按模式物理隔离，LLM 看不到另一模式的工具
@@ -337,24 +367,26 @@ impl LLMScheduler {
                 .join("\n")
         };
 
-        // 4. 当前 canvas 状态摘要（作为上下文注入）
+        // 4. 当前 canvas 状态摘要（按模式过滤，不暴露另一模式的数据）
         let canvas_summary = {
             let canvas = engine.canvas.lock().unwrap();
             canvas.as_ref().map(|c| {
-                let mut s = format!(
-                    "当前画布: {}, 节点数: {}, 连线数: {}, 主题: {:?}",
-                    c.title,
-                    c.nodes.len(),
-                    c.edges.len(),
-                    c.theme
-                );
-                if let Some(ref pixel) = c.pixel {
-                    s.push_str(&format!(
-                        "\n像素画布: {}×{} 网格, {} 个彩色格子",
-                        pixel.cols, pixel.rows, pixel.cells.len()
-                    ));
+                if self.canvas_mode.as_deref() == Some("pixel") {
+                    // 像素模式：只显示像素信息
+                    let pixel_info = c.pixel.as_ref().map(|p| {
+                        format!("像素画布: {}×{} 网格, {} 个彩色格子", p.cols, p.rows, p.cells.len())
+                    }).unwrap_or_else(|| "像素画布为空".into());
+                    pixel_info
+                } else {
+                    // 矢量模式：只显示节点/连线信息
+                    format!(
+                        "当前画布: {}, 节点数: {}, 连线数: {}, 主题: {:?}",
+                        c.title,
+                        c.nodes.len(),
+                        c.edges.len(),
+                        c.theme
+                    )
                 }
-                s
             }).unwrap_or_default()
         };
 
@@ -451,6 +483,14 @@ impl LLMScheduler {
                 );
             }
 
+            // 每轮工具执行后推送中间画布状态到前端
+            if let Some(ref tx) = progress_tx {
+                let state = engine.canvas.lock().unwrap().clone();
+                if let Some(ref s) = state {
+                    let _ = tx.send(serde_json::to_value(s).unwrap_or_default());
+                }
+            }
+
             if round == self.max_rounds - 1 {
                 final_content = "已完成操作（达到最大轮次限制）".into();
             }
@@ -481,6 +521,36 @@ pub struct SchedulerResult {
     pub canvas_state: Option<crate::engine::canvas_state::CanvasState>,
     /// 需要前端先处理的异步操作（如风格转换需要前端捕获 canvas 图像）
     pub pending_action: Option<crate::engine::canvas_state::PendingAction>,
+}
+
+/// 本地判断指令是否简单，跳过 LLM 复杂度检查（省 ~2s）
+fn is_simple_command(text: &str) -> bool {
+    let text = text.trim();
+    // 短指令
+    if text.chars().count() <= 8 {
+        return true;
+    }
+    // 单目标操作
+    let simple_prefixes = [
+        "画一个", "画个", "添加一个", "加一个",
+        "删除", "去掉", "移除", "清除",
+        "改成", "换成", "设置为", "变为",
+        "清空", "撤销", "重做", "导出",
+    ];
+    if simple_prefixes.iter().any(|p| text.starts_with(p)) {
+        return true;
+    }
+    // 单图形名
+    let single_target = [
+        "笑脸", "笑哭", "爱心眼", "生气", "哭泣", "酷", "墨镜", "惊讶", "眨眼", "吐舌",
+        "方块", "矩形", "圆形", "三角形", "直线", "点",
+        "房子", "太阳", "树", "星星",
+        "红色", "蓝色", "绿色", "黄色", "白色", "黑色",
+    ];
+    if single_target.iter().any(|k| text.contains(k)) && text.chars().count() <= 15 {
+        return true;
+    }
+    false
 }
 
 /// 像素画布泛洪填充（BFS）
