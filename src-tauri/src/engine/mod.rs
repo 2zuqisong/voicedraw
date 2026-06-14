@@ -6,6 +6,7 @@ pub mod style_ops;
 pub mod snapshot;
 pub mod grid;
 pub mod shapes;
+pub mod style_transfer;
 
 pub use canvas_state::*;
 

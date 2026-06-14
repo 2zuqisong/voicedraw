@@ -189,6 +189,25 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                 "required": []
             }),
         ),
+        tool(
+            "apply_style",
+            "将画布上的图形进行艺术风格转换。用户说'变成XX风格'/'切换成XX画风'/'转成XX效果'时调用。预设风格：梵高星空/莫奈印象/浮世绘/水墨画/像素风/素描。",
+            json!({
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "风格描述提示词（中文），如'梵高星空风格油画，强烈漩涡笔触，深蓝夜空，亮黄星星，厚涂纹理'。LLM 应自动将简单的风格名称扩展为详细的艺术描述。"
+                    },
+                    "node_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "要应用风格的目标节点 ID 列表。从对话历史中匹配目标节点。省略则应用于整个画布。"
+                    }
+                },
+                "required": ["prompt"]
+            }),
+        ),
     ]
 }
 
