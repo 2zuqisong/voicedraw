@@ -261,10 +261,18 @@ impl LLMScheduler {
     ) -> Result<SchedulerResult, String> {
         let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
 
-        // 1. System prompt
+        // 1. System prompt（像素模式时前置强指令，覆盖矢量示例）
+        let system_prompt_raw = get_system_prompt();
+        let system_prompt = match self.canvas_mode.as_deref() {
+            Some("pixel") => format!(
+                "## 🎨 当前模式：像素绘画\n\n你只能使用像素工具：pixel_set, pixel_fill, pixel_rect, pixel_clear。\n绝对禁止使用矢量工具（add_node, add_nodes_batch, add_edge 等）。\n即使指令看起来需要矢量图形，也要用像素格子画出来。\n\n{}",
+                system_prompt_raw
+            ),
+            _ => system_prompt_raw,
+        };
         messages.push(
             ChatCompletionRequestSystemMessageArgs::default()
-                .content(get_system_prompt())
+                .content(system_prompt)
                 .build()
                 .map_err(|e| format!("构建 system message 失败: {}", e))?
                 .into(),
@@ -314,10 +322,6 @@ impl LLMScheduler {
         };
 
         // 4. 当前 canvas 状态摘要（作为上下文注入）
-        let mode_hint = match self.canvas_mode.as_deref() {
-            Some("pixel") => "\n⚠️ 当前处于像素绘画模式，请使用像素工具（pixel_set/pixel_fill/pixel_rect/pixel_clear）操作像素画布，不要使用矢量工具。",
-            _ => "",
-        };
         let canvas_summary = {
             let canvas = engine.canvas.lock().unwrap();
             canvas.as_ref().map(|c| {
@@ -334,7 +338,6 @@ impl LLMScheduler {
                         pixel.cols, pixel.rows, pixel.cells.len()
                     ));
                 }
-                s.push_str(mode_hint);
                 s
             }).unwrap_or_default()
         };
