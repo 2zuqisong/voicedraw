@@ -152,8 +152,15 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
       .then((result) => {
         logStyleTransfer("风格转换完成，应用结果到画布...");
 
-        // Step 3: 移除目标节点
+        // Step 3: 记录目标节点的包围盒，然后移除
+        let targetBounds = { left: 40, top: 24, width: 200, height: 200 };
+        let foundBounds = false;
+
         if (result.replaced_node_ids.length > 0) {
+          let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
           const toRemove: fabric.Object[] = [];
           canvas.getObjects().forEach((obj) => {
             const data = (obj as any).data;
@@ -161,18 +168,74 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
               data?.nodeId &&
               result.replaced_node_ids.includes(data.nodeId)
             ) {
+              const bounds = obj.getBoundingRect();
+              minX = Math.min(minX, bounds.left);
+              minY = Math.min(minY, bounds.top);
+              maxX = Math.max(maxX, bounds.left + bounds.width);
+              maxY = Math.max(maxY, bounds.top + bounds.height);
               toRemove.push(obj);
             }
           });
           toRemove.forEach((obj) => canvas.remove(obj));
+
+          if (isFinite(minX)) {
+            targetBounds = {
+              left: minX - 16,
+              top: minY - 8,
+              width: maxX - minX + 32,
+              height: maxY - minY + 16,
+            };
+            foundBounds = true;
+          }
+        } else {
+          // 整画布模式：包围盒覆盖所有非网格对象
+          let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
+          canvas.getObjects().forEach((obj) => {
+            if ((obj as any).isGridLine) return;
+            const bounds = obj.getBoundingRect();
+            minX = Math.min(minX, bounds.left);
+            minY = Math.min(minY, bounds.top);
+            maxX = Math.max(maxX, bounds.left + bounds.width);
+            maxY = Math.max(maxY, bounds.top + bounds.height);
+          });
+          if (isFinite(minX)) {
+            targetBounds = {
+              left: minX,
+              top: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            };
+            foundBounds = true;
+            // 移除所有非网格对象
+            const toRemove: fabric.Object[] = [];
+            canvas.getObjects().forEach((obj) => {
+              if (!(obj as any).isGridLine) toRemove.push(obj);
+            });
+            toRemove.forEach((obj) => canvas.remove(obj));
+          }
         }
 
-        // Step 4: 将结果图片贴到画布
+        // Step 4: 将结果图片放到原节点位置
         fabric.FabricImage.fromURL(result.image_base64).then((img) => {
           if (!img) return;
+          const imgW = img.width!;
+          const imgH = img.height!;
+          const scaleX = targetBounds.width / imgW;
+          const scaleY = targetBounds.height / imgH;
+          const scale = foundBounds ? Math.min(scaleX, scaleY) : 1;
+
           img.set({
-            left: 40,
-            top: 24,
+            left:
+              targetBounds.left +
+              (targetBounds.width - imgW * scale) / 2,
+            top:
+              targetBounds.top +
+              (targetBounds.height - imgH * scale) / 2,
+            scaleX: scale,
+            scaleY: scale,
             selectable: true,
             evented: true,
           });
