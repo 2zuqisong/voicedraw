@@ -20,6 +20,7 @@ struct StyleInput {
     function: String,
     prompt: String,
     /// Base64 data URL, e.g. "data:image/png;base64,iVBOR..."
+    #[serde(rename = "base_image_url")]
     base_image: String,
 }
 
