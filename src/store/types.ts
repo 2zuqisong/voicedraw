@@ -242,22 +242,14 @@ export interface AppSettings {
 
 export type CanvasMode = "vector" | "pixel";
 
-export type PixelTool = "pencil" | "eraser" | "fill" | "picker";
-
-/** 像素画布状态 */
+/** 像素画布本地渲染状态（数据源来自 Rust canvasState.pixel） */
 export interface PixelState {
   /** "row,col" → hex 颜色 */
   data: Record<string, string>;
-  /** 当前画笔颜色 */
-  color: string;
-  /** 当前工具 */
-  tool: PixelTool;
   /** 格子像素大小 */
   cellSize: number;
   /** 网格列数 */
   cols: number;
   /** 网格行数 */
   rows: number;
-  /** 撤销栈 */
-  undoStack: Record<string, string>[];
 }

@@ -77,6 +77,8 @@ pub struct LLMScheduler {
     plan_cache: Option<OperationPlan>,
     /// 触发当前 plan 的原始用户文本（用于 confirm_plan 时恢复）
     pub(crate) cached_user_text: Option<String>,
+    /// 当前画布模式（"vector" 或 "pixel"）
+    canvas_mode: Option<String>,
 }
 
 impl LLMScheduler {
@@ -86,6 +88,7 @@ impl LLMScheduler {
             max_rounds: 5,
             plan_cache: None,
             cached_user_text: None,
+            canvas_mode: None,
         }
     }
 
@@ -95,7 +98,11 @@ impl LLMScheduler {
         user_text: &str,
         history: &[(String, String)], // (role, content)
         engine: &AppEngine,
+        canvas_mode: Option<&str>,
     ) -> Result<ProcessResult, String> {
+        if let Some(mode) = canvas_mode {
+            self.canvas_mode = Some(mode.to_string());
+        }
         log::info!(
             "LLM Scheduler: 处理指令 '{}', 历史 {} 轮",
             user_text,
@@ -307,16 +314,28 @@ impl LLMScheduler {
         };
 
         // 4. 当前 canvas 状态摘要（作为上下文注入）
+        let mode_hint = match self.canvas_mode.as_deref() {
+            Some("pixel") => "\n⚠️ 当前处于像素绘画模式，请使用像素工具（pixel_set/pixel_fill/pixel_rect/pixel_clear）操作像素画布，不要使用矢量工具。",
+            _ => "",
+        };
         let canvas_summary = {
             let canvas = engine.canvas.lock().unwrap();
             canvas.as_ref().map(|c| {
-                format!(
+                let mut s = format!(
                     "当前画布: {}, 节点数: {}, 连线数: {}, 主题: {:?}",
                     c.title,
                     c.nodes.len(),
                     c.edges.len(),
                     c.theme
-                )
+                );
+                if let Some(ref pixel) = c.pixel {
+                    s.push_str(&format!(
+                        "\n像素画布: {}×{} 网格, {} 个彩色格子",
+                        pixel.cols, pixel.rows, pixel.cells.len()
+                    ));
+                }
+                s.push_str(mode_hint);
+                s
             }).unwrap_or_default()
         };
 
