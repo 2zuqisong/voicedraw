@@ -73,6 +73,13 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
     _activeCanvas = canvas;
     renderGrid(canvas, w, h);
 
+    // 重挂时立即渲染已有 canvasState，确保数据不丢
+    const currentState = useAppStore.getState().canvasState;
+    if (currentState) {
+      prevStateRef.current = currentState;
+      renderCanvasState(canvas, currentState);
+    }
+
     // ResizeObserver：容器大小变化时更新画布和网格
     let firstResize = true;
     const observer = new ResizeObserver((entries) => {
