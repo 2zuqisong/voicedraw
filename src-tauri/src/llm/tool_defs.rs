@@ -18,14 +18,19 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                                 "type": {
                                     "type": "string",
                                     "enum": ["start", "end", "process", "decision", "data", "subprocess", "text"],
-                                    "description": "节点类型"
+                                    "description": "流程图节点类型（与 shape_type 二选一）"
+                                },
+                                "shape_type": {
+                                    "type": "string",
+                                    "enum": ["circle", "rectangle", "triangle", "line", "dot", "house", "sun", "tree", "smiley", "star"],
+                                    "description": "几何图形类型（与 type 二选一，画几何图形时用此字段）"
                                 },
                                 "label": {
                                     "type": "string",
                                     "description": "节点显示的文本标签"
                                 }
                             },
-                            "required": ["type", "label"]
+                            "required": ["label"]
                         }
                     },
                     "grid_x": {
@@ -68,7 +73,8 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
             json!({
                 "type": "object",
                 "properties": {
-                    "type": {"type": "string", "enum": ["start", "end", "process", "decision", "data", "subprocess", "text"]},
+                    "type": {"type": "string", "enum": ["start", "end", "process", "decision", "data", "subprocess", "text"], "description": "流程图节点类型（与 shape_type 二选一）"},
+                    "shape_type": {"type": "string", "enum": ["circle", "rectangle", "triangle", "line", "dot", "house", "sun", "tree", "smiley", "star"], "description": "几何图形类型（与 type 二选一，画几何图形时用此字段）"},
                     "label": {"type": "string"},
                     "position": {
                         "type": "object",
@@ -86,7 +92,7 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                         "description": "网格 Y 坐标（可选，不填则自动找空位）。1格=20像素"
                     }
                 },
-                "required": ["type", "label"]
+                "required": ["label"]
             }),
         ),
         tool(

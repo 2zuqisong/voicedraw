@@ -118,6 +118,7 @@ mod tests {
             DiagramNode {
                 id: "n1".into(),
                 node_type: NodeType::Process,
+                shape_type: None,
                 label: "占位".into(),
                 position: Position { x: 40.0, y: 24.0 },
                 size: Size {
@@ -125,6 +126,7 @@ mod tests {
                     height: 60.0,
                 },
                 style: NodeStyle::default(),
+                sub_shapes: None,
             },
         );
         let (gx, gy) = cfg.find_empty_anchor(&nodes);

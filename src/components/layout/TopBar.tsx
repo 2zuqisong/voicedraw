@@ -23,7 +23,7 @@ export default function TopBar() {
         alignItems: "center",
         gap: 12,
         fontFamily: "var(--font-mono)",
-        fontSize: 16,
+        fontSize: 20,
         fontWeight: 300,
         letterSpacing: "0.02em",
         color: "var(--text-secondary)",

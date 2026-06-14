@@ -15,10 +15,12 @@ pub fn add_node(
     let node = DiagramNode {
         id: id.clone(),
         node_type,
+        shape_type: None,
         label,
         position: pos,
         size: Size { width: 160.0, height: 60.0 },
         style: style.unwrap_or_default(),
+        sub_shapes: None,
     };
     nodes.insert(id, node.clone());
     node

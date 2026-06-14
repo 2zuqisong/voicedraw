@@ -460,10 +460,6 @@ fn execute_tool_call(
 
     match name {
         "add_node" => {
-            let node_type = crate::engine::canvas_state::NodeType::from_str(
-                args["type"].as_str().unwrap_or("process"),
-            )
-            .map_err(|e| format!("{}", e))?;
             let label = args["label"].as_str().unwrap_or("未命名").to_string();
 
             // 如果提供了网格坐标，转换为像素位置
@@ -486,14 +482,56 @@ fn execute_tool_call(
                 None
             };
 
-            let node = crate::engine::node_ops::add_node(
-                &mut state.nodes,
-                node_type,
-                label,
-                position,
-                None,
-            );
-            Ok(serde_json::json!({"node_id": node.id, "label": node.label}).to_string())
+            // 检查 shape_type（几何图形路径）
+            if let Some(st) = args["shape_type"].as_str() {
+                let shape_type = crate::engine::canvas_state::ShapeType::from_str(st)
+                    .map_err(|e| format!("{}", e))?;
+
+                let (sub_shapes, override_size) =
+                    if crate::engine::shapes::is_composite(st) {
+                        crate::engine::shapes::get_composite_shapes(st)
+                            .map(|(shapes, w, h)| (Some(shapes), Some((w, h))))
+                            .unwrap_or((None, None))
+                    } else {
+                        (None, None)
+                    };
+
+                let node_type = crate::engine::canvas_state::NodeType::Process; // placeholder
+
+                let node = crate::engine::node_ops::add_node(
+                    &mut state.nodes, node_type, label, position, None,
+                );
+
+                if let Some(n) = state.nodes.get_mut(&node.id) {
+                    n.shape_type = Some(shape_type);
+                    if let Some(shapes) = sub_shapes {
+                        n.sub_shapes = Some(shapes);
+                        if let Some((w, h)) = override_size {
+                            n.size = crate::engine::canvas_state::Size { width: w, height: h };
+                        }
+                    }
+                    if let Some(fill) = args["fill"].as_str() {
+                        n.style.fill = fill.to_string();
+                    }
+                }
+
+                Ok(serde_json::json!({"node_id": node.id, "label": node.label, "shape_type": st}).to_string())
+            } else {
+                // 原有流程图路径
+                let node_type = crate::engine::canvas_state::NodeType::from_str(
+                    args["type"].as_str().unwrap_or("process"),
+                )
+                .map_err(|e| format!("{}", e))?;
+
+                let node = crate::engine::node_ops::add_node(
+                    &mut state.nodes,
+                    node_type,
+                    label,
+                    position,
+                    None,
+                );
+                Ok(serde_json::json!({"node_id": node.id, "label": node.label}).to_string())
+            }
         }
         "add_nodes_batch" => {
             let nodes = args["nodes"]
@@ -542,6 +580,34 @@ fn execute_tool_call(
                     if let Some(n) = state.nodes.get_mut(&node.id) {
                         n.position.x += dx;
                         n.position.y += dy;
+                    }
+                }
+            }
+
+            // 应用 shape_type + sub_shapes（几何图形节点）
+            if let Some(nodes_arr) = args["nodes"].as_array() {
+                for (i, node_arg) in nodes_arr.iter().enumerate() {
+                    if let Some(st) = node_arg["shape_type"].as_str() {
+                        if i < created.len() {
+                            let node_id = &created[i].id;
+                            if let Some(n) = state.nodes.get_mut(node_id) {
+                                n.shape_type = Some(
+                                    crate::engine::canvas_state::ShapeType::from_str(st)
+                                        .unwrap_or(crate::engine::canvas_state::ShapeType::Rectangle),
+                                );
+                                if crate::engine::shapes::is_composite(st) {
+                                    if let Some((shapes, w, h)) =
+                                        crate::engine::shapes::get_composite_shapes(st)
+                                    {
+                                        n.sub_shapes = Some(shapes);
+                                        n.size = crate::engine::canvas_state::Size { width: w, height: h };
+                                    }
+                                }
+                                if let Some(fill) = node_arg["fill"].as_str() {
+                                    n.style.fill = fill.to_string();
+                                }
+                            }
+                        }
                     }
                 }
             }

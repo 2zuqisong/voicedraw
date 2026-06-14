@@ -28,6 +28,41 @@ impl NodeType {
     }
 }
 
+/// 几何图形类型（与流程图 NodeType 并列，互不干扰）
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum ShapeType {
+    // 基本几何图形
+    Circle,
+    Rectangle,
+    Triangle,
+    Line,
+    Dot,
+    // 复合图形
+    House,
+    Sun,
+    Tree,
+    Smiley,
+    Star,
+}
+
+impl ShapeType {
+    pub fn from_str(s: &str) -> Result<Self, String> {
+        match s {
+            "circle" => Ok(Self::Circle),
+            "rectangle" => Ok(Self::Rectangle),
+            "triangle" => Ok(Self::Triangle),
+            "line" => Ok(Self::Line),
+            "dot" => Ok(Self::Dot),
+            "house" => Ok(Self::House),
+            "sun" => Ok(Self::Sun),
+            "tree" => Ok(Self::Tree),
+            "smiley" => Ok(Self::Smiley),
+            "star" => Ok(Self::Star),
+            _ => Err(format!("未知图形类型: {}", s)),
+        }
+    }
+}
+
 /// 位置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {
@@ -64,6 +99,30 @@ impl Default for NodeStyle {
             border_radius: 8.0,
         }
     }
+}
+
+/// 复合图形的子组件定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubShape {
+    /// 子组件类型: "circle", "rect", "triangle", "line", "arc", "star_polygon"
+    pub shape_type: String,
+    /// 相对父节点左上角的 X 偏移
+    pub rel_x: f64,
+    /// 相对父节点左上角的 Y 偏移
+    pub rel_y: f64,
+    /// 宽度
+    pub width: f64,
+    /// 高度
+    pub height: f64,
+    /// 填充色
+    pub fill: String,
+    /// 边框色
+    pub stroke: String,
+    /// 边框宽度
+    pub stroke_width: f64,
+    /// 圆半径（圆形/点用）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f64>,
 }
 
 /// 连线样式
@@ -105,10 +164,16 @@ impl Default for EdgeStyle {
 pub struct DiagramNode {
     pub id: String,
     pub node_type: NodeType,
+    /// 几何图形类型（与 node_type 并列，二选一生效；前端渲染时优先检查此字段）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shape_type: Option<ShapeType>,
     pub label: String,
     pub position: Position,
     pub size: Size,
     pub style: NodeStyle,
+    /// 复合图形的子组件列表（非复合图形为 None）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub_shapes: Option<Vec<SubShape>>,
 }
 
 /// 图表连线
