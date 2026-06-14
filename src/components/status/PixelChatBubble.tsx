@@ -15,11 +15,11 @@ export default function PixelChatBubble() {
     <div
       style={{
         position: "absolute",
-        top: 52,
+        top: 16,
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 90,
-        maxWidth: 400,
+        maxWidth: 320,
         padding: "6px 16px",
         borderRadius: 16,
         background: isBusy ? "rgba(0,0,0,0.06)" : "rgba(0,0,0,0.03)",

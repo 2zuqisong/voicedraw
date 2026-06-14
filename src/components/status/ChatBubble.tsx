@@ -51,7 +51,7 @@ export default function ChatBubble() {
         lineHeight: 1.8,
         color: "var(--text-secondary)",
         cursor: "pointer",
-        zIndex: 110,
+        zIndex: 85,
         userSelect: "text",
         opacity: fadeOut ? 0 : 1,
         transition: "opacity 0.25s",
