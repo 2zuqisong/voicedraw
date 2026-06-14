@@ -2,6 +2,12 @@ import { useEffect, useRef } from "react";
 import * as fabric from "fabric";
 import { initFabricCanvas } from "../../lib/fabric-setup";
 import type { CanvasState } from "../../store/types";
+import {
+  renderBasicShape,
+  renderCompositeShape,
+  isCompositeShape,
+  isBasicShape,
+} from "./ShapeRenderer";
 
 interface CanvasViewProps {
   canvasState: CanvasState | null;
@@ -142,41 +148,61 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
   );
 }
 
-/** 渲染坐标网格背景 — dot grid 极简风格 */
+/** 渲染坐标网格背景 — draw.io 风格淡灰线条 */
 function renderGrid(
   canvas: fabric.Canvas,
   width: number,
   height: number,
 ): void {
   const { grid_size, grid_origin_x, grid_origin_y } = DEFAULT_GRID;
+
+  const offscreen = document.createElement("canvas");
+  offscreen.width = width;
+  offscreen.height = height;
+  const ctx = offscreen.getContext("2d")!;
+
+  // 细线（每格一条，极淡灰）
+  ctx.strokeStyle = "#e6e6e2";
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  for (let x = grid_origin_x; x <= width; x += grid_size) {
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
+  }
+  for (let y = grid_origin_y; y <= height; y += grid_size) {
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+  }
+  ctx.stroke();
+
+  // 粗线（每 5 格一条，淡灰）
   const majorStep = grid_size * 5;
-
-  const dots: fabric.Circle[] = [];
-
-  // 仅在 5 格交点处放置圆点（极简参考点）
+  ctx.strokeStyle = "#d4d4ce";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
   for (let x = grid_origin_x; x <= width; x += majorStep) {
-    for (let y = grid_origin_y; y <= height; y += majorStep) {
-      const dot = new fabric.Circle({
-        left: x,
-        top: y,
-        radius: 1.6,
-        fill: "#d4d4ce",
-        selectable: false,
-        evented: false,
-        excludeFromExport: true,
-      });
-      (dot as any).isGridLine = true;
-      dots.push(dot);
-    }
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, height);
   }
+  for (let y = grid_origin_y; y <= height; y += majorStep) {
+    ctx.moveTo(0, y);
+    ctx.lineTo(width, y);
+  }
+  ctx.stroke();
 
-  const prevRenderOnAddRemove = canvas.renderOnAddRemove;
-  canvas.renderOnAddRemove = false;
-  for (const dot of dots) {
-    canvas.add(dot);
-  }
-  canvas.renderOnAddRemove = prevRenderOnAddRemove;
-  canvas.requestRenderAll();
+  fabric.FabricImage.fromURL(offscreen.toDataURL()).then((img) => {
+    img.set({
+      left: 0,
+      top: 0,
+      selectable: false,
+      evented: false,
+      excludeFromExport: true,
+    });
+    (img as any).isGridLine = true;
+    canvas.add(img);
+    canvas.sendObjectToBack(img);
+    canvas.requestRenderAll();
+  });
 }
 
 /** 将 CanvasState 渲染到 Fabric.js（不清除网格线） */
@@ -194,7 +220,7 @@ function renderCanvasState(
   toRemove.forEach((obj) => canvas.remove(obj));
 
   canvas.backgroundColor =
-    state.theme === "Dark" ? "#1c1c18" : "#fafaf8";
+    state.theme === "Dark" ? "#1c1c18" : "#f4f4f2";
 
   // 渲染连线
   for (const edge of Object.values(state.edges)) {
@@ -214,8 +240,54 @@ function renderNode(
   canvas: fabric.Canvas,
   node: CanvasState["nodes"][string],
 ): void {
-  const { position, size, style, label, node_type } = node;
+  const { position, size, style, label, node_type, shape_type } = node;
 
+  // --- Composite shapes: render as fabric.Group from sub_shapes ---
+  if (shape_type && isCompositeShape(shape_type)) {
+    const group = renderCompositeShape(node);
+    (group as any).data = { nodeId: node.id, nodeType: node_type, shapeType: shape_type };
+
+    if (label && label.length > 0) {
+      const text = new fabric.Text(label, {
+        left: 0,
+        top: -22,
+        fontSize: style.font_size,
+        fontFamily: style.font_family,
+        fill: "#1a1a1a",
+        textAlign: "center",
+      });
+      text.set({ left: (node.size.width - text.width) / 2 });
+      group.add(text);
+    }
+
+    canvas.add(group);
+    return;
+  }
+
+  // --- Basic geometric shapes: single fabric object + label ---
+  if (shape_type && isBasicShape(shape_type)) {
+    const shape = renderBasicShape(node);
+    const text = new fabric.Text(label, {
+      left: position.x + size.width / 2,
+      top: position.y + size.height / 2,
+      fontSize: style.font_size,
+      fontFamily: style.font_family,
+      fill: "#1a1a1a",
+      originX: "center",
+      originY: "center",
+      textAlign: "center",
+    });
+
+    const group = new fabric.Group([shape, text], {
+      left: position.x,
+      top: position.y,
+    });
+    (group as any).data = { nodeId: node.id, nodeType: node_type, shapeType: shape_type };
+    canvas.add(group);
+    return;
+  }
+
+  // --- Existing flowchart node rendering (unchanged) ---
   let shape: fabric.Object;
 
   switch (node_type) {
