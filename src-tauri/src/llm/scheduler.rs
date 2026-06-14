@@ -77,6 +77,8 @@ pub struct LLMScheduler {
     plan_cache: Option<OperationPlan>,
     /// 触发当前 plan 的原始用户文本（用于 confirm_plan 时恢复）
     pub(crate) cached_user_text: Option<String>,
+    /// 当前画布模式（"vector" 或 "pixel"）
+    canvas_mode: Option<String>,
 }
 
 impl LLMScheduler {
@@ -86,6 +88,7 @@ impl LLMScheduler {
             max_rounds: 5,
             plan_cache: None,
             cached_user_text: None,
+            canvas_mode: None,
         }
     }
 
@@ -95,7 +98,11 @@ impl LLMScheduler {
         user_text: &str,
         history: &[(String, String)], // (role, content)
         engine: &AppEngine,
+        canvas_mode: Option<&str>,
     ) -> Result<ProcessResult, String> {
+        if let Some(mode) = canvas_mode {
+            self.canvas_mode = Some(mode.to_string());
+        }
         log::info!(
             "LLM Scheduler: 处理指令 '{}', 历史 {} 轮",
             user_text,
@@ -254,10 +261,18 @@ impl LLMScheduler {
     ) -> Result<SchedulerResult, String> {
         let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
 
-        // 1. System prompt
+        // 1. System prompt（像素模式时前置强指令，覆盖矢量示例）
+        let system_prompt_raw = get_system_prompt();
+        let system_prompt = match self.canvas_mode.as_deref() {
+            Some("pixel") => format!(
+                "## 🎨 当前模式：像素绘画\n\n你只能使用像素工具：pixel_set, pixel_fill, pixel_rect, pixel_clear。\n绝对禁止使用矢量工具（add_node, add_nodes_batch, add_edge 等）。\n即使指令看起来需要矢量图形，也要用像素格子画出来。\n\n{}",
+                system_prompt_raw
+            ),
+            _ => system_prompt_raw,
+        };
         messages.push(
             ChatCompletionRequestSystemMessageArgs::default()
-                .content(get_system_prompt())
+                .content(system_prompt)
                 .build()
                 .map_err(|e| format!("构建 system message 失败: {}", e))?
                 .into(),
@@ -310,13 +325,20 @@ impl LLMScheduler {
         let canvas_summary = {
             let canvas = engine.canvas.lock().unwrap();
             canvas.as_ref().map(|c| {
-                format!(
+                let mut s = format!(
                     "当前画布: {}, 节点数: {}, 连线数: {}, 主题: {:?}",
                     c.title,
                     c.nodes.len(),
                     c.edges.len(),
                     c.theme
-                )
+                );
+                if let Some(ref pixel) = c.pixel {
+                    s.push_str(&format!(
+                        "\n像素画布: {}×{} 网格, {} 个彩色格子",
+                        pixel.cols, pixel.rows, pixel.cells.len()
+                    ));
+                }
+                s
             }).unwrap_or_default()
         };
 
@@ -443,6 +465,58 @@ pub struct SchedulerResult {
     pub canvas_state: Option<crate::engine::canvas_state::CanvasState>,
     /// 需要前端先处理的异步操作（如风格转换需要前端捕获 canvas 图像）
     pub pending_action: Option<crate::engine::canvas_state::PendingAction>,
+}
+
+/// 像素画布泛洪填充（BFS）
+fn pixel_flood_fill(
+    cells: &mut std::collections::HashMap<String, String>,
+    cols: u32,
+    rows: u32,
+    start_row: i32,
+    start_col: i32,
+    target_color: &Option<String>,
+    fill_color: &str,
+) -> usize {
+    let key = format!("{},{}", start_row, start_col);
+    let current = cells.get(&key).cloned();
+
+    // 只填充同色相连区域
+    if current.as_ref() != target_color.as_ref() {
+        return 0;
+    }
+    // 如果目标色就是填充色，无需操作
+    if target_color.as_ref().map_or(false, |c| c == fill_color) {
+        return 0;
+    }
+
+    let mut count = 0;
+    let mut stack = vec![(start_row, start_col)];
+    let mut visited = std::collections::HashSet::new();
+    visited.insert(key);
+
+    while let Some((r, c)) = stack.pop() {
+        let k = format!("{},{}", r, c);
+        let cell_color = cells.get(&k).cloned();
+
+        if cell_color.as_ref() == target_color.as_ref() {
+            cells.insert(k, fill_color.to_string());
+            count += 1;
+
+            for (dr, dc) in &[(-1, 0), (1, 0), (0, -1), (0, 1)] {
+                let nr = r + dr;
+                let nc = c + dc;
+                if nr >= 0 && nr < rows as i32 && nc >= 0 && nc < cols as i32 {
+                    let nk = format!("{},{}", nr, nc);
+                    if !visited.contains(&nk) {
+                        visited.insert(nk);
+                        stack.push((nr, nc));
+                    }
+                }
+            }
+        }
+    }
+
+    count
 }
 
 /// 执行单个工具调用，返回 JSON 字符串结果
@@ -843,6 +917,96 @@ fn execute_tool_call(
                 "message": format!("风格转换指令已接收，将对 {} 应用风格", target_desc)
             })
             .to_string())
+        }
+        // ── 像素绘画工具 ─────────────────────────────────────────────
+        "pixel_set" => {
+            use crate::engine::canvas_state::PixelCanvas;
+            let cells = args["cells"].as_array().ok_or("cells 必须是数组")?;
+            // 自动初始化像素画布
+            if state.pixel.is_none() {
+                state.pixel = Some(PixelCanvas {
+                    cells: std::collections::HashMap::new(),
+                    cell_size: 20,
+                    cols: 32,
+                    rows: 32,
+                });
+            }
+            let pixel = state.pixel.as_mut().unwrap();
+            let mut set_count = 0;
+            let mut erase_count = 0;
+            for cell in cells {
+                let row = cell["row"].as_u64().ok_or("row 必须是整数")? as u32;
+                let col = cell["col"].as_u64().ok_or("col 必须是整数")? as u32;
+                let key = format!("{},{}", row, col);
+                if let Some(color) = cell["color"].as_str() {
+                    pixel.cells.insert(key, color.to_string());
+                    set_count += 1;
+                } else {
+                    pixel.cells.remove(&key);
+                    erase_count += 1;
+                }
+            }
+            Ok(serde_json::json!({
+                "success": true,
+                "set": set_count,
+                "erased": erase_count
+            }).to_string())
+        }
+        "pixel_fill" => {
+            use crate::engine::canvas_state::PixelCanvas;
+            let row = args["row"].as_u64().ok_or("缺少 row")? as i32;
+            let col = args["col"].as_u64().ok_or("缺少 col")? as i32;
+            let color = args["color"].as_str().ok_or("缺少 color")?;
+            if state.pixel.is_none() {
+                state.pixel = Some(PixelCanvas {
+                    cells: std::collections::HashMap::new(),
+                    cell_size: 20,
+                    cols: 32,
+                    rows: 32,
+                });
+            }
+            let pixel = state.pixel.as_mut().unwrap();
+            let key = format!("{},{}", row, col);
+            let target = pixel.cells.get(&key).cloned();
+            let count = pixel_flood_fill(&mut pixel.cells, pixel.cols, pixel.rows, row, col, &target, color);
+            Ok(serde_json::json!({
+                "success": true,
+                "filled": count
+            }).to_string())
+        }
+        "pixel_rect" => {
+            use crate::engine::canvas_state::PixelCanvas;
+            let row = args["row"].as_u64().ok_or("缺少 row")? as i32;
+            let col = args["col"].as_u64().ok_or("缺少 col")? as i32;
+            let w = args["width"].as_u64().ok_or("缺少 width")? as i32;
+            let h = args["height"].as_u64().ok_or("缺少 height")? as i32;
+            let color = args["color"].as_str().ok_or("缺少 color")?;
+            if state.pixel.is_none() {
+                state.pixel = Some(PixelCanvas {
+                    cells: std::collections::HashMap::new(),
+                    cell_size: 20,
+                    cols: 32,
+                    rows: 32,
+                });
+            }
+            let pixel = state.pixel.as_mut().unwrap();
+            let mut count = 0;
+            for r in row..(row + h) {
+                for c in col..(col + w) {
+                    pixel.cells.insert(format!("{},{}", r, c), color.to_string());
+                    count += 1;
+                }
+            }
+            Ok(serde_json::json!({
+                "success": true,
+                "filled": count
+            }).to_string())
+        }
+        "pixel_clear" => {
+            if let Some(ref mut pixel) = state.pixel {
+                pixel.cells.clear();
+            }
+            Ok(serde_json::json!({"success": true, "message": "像素画布已清空"}).to_string())
         }
         _ => {
             log::error!("未知工具调用: {}", name);

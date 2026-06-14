@@ -19,6 +19,7 @@ pub async fn process_command(
     llm_api_key: Option<String>,
     llm_endpoint: Option<String>,
     llm_model: Option<String>,
+    canvas_mode: Option<String>,
 ) -> Result<serde_json::Value, String> {
     log::info!("process_command: '{}'", text);
 
@@ -71,7 +72,7 @@ pub async fn process_command(
                 guard.take().unwrap()
             };
 
-            let result = scheduler.process(&enriched_text, &history, &ENGINE).await;
+            let result = scheduler.process(&enriched_text, &history, &ENGINE, canvas_mode.as_deref()).await;
 
             // 将 scheduler 放回全局
             *LLM_SCHEDULER.lock().unwrap() = Some(scheduler);
@@ -217,7 +218,7 @@ pub async fn modify_plan(new_text: String) -> Result<serde_json::Value, String> 
         .ok_or("调度器未初始化")?;
 
     scheduler.modify_plan();
-    let result = scheduler.process(&new_text, &history, &ENGINE).await;
+    let result = scheduler.process(&new_text, &history, &ENGINE, None).await;
 
     // 放回
     *LLM_SCHEDULER.lock().unwrap() = Some(scheduler);

@@ -99,7 +99,7 @@ async fn handle_process_command(
                 guard.take().unwrap()
             };
 
-            let result = scheduler.process(&enriched_text, &history, &ENGINE).await;
+            let result = scheduler.process(&enriched_text, &history, &ENGINE, None).await;
 
             // Put scheduler back
             *LLM_SCHEDULER.lock().unwrap() = Some(scheduler);
@@ -315,7 +315,7 @@ async fn handle_modify_plan(
     };
 
     scheduler.modify_plan();
-    let result = scheduler.process(&args.new_text, &history, &ENGINE).await;
+    let result = scheduler.process(&args.new_text, &history, &ENGINE, None).await;
 
     *LLM_SCHEDULER.lock().unwrap() = Some(scheduler);
 

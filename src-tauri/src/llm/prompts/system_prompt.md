@@ -381,3 +381,48 @@
 - 时刻记住这些示例的操作模式——批量创建→连线→布局
 - 复杂的用户指令 = 多个简单示例的组合
 - 当用户说"和刚才那个一样"时，复用上一轮的图表结构
+
+## 像素绘画模式
+
+**❗必须调用工具，禁止只回复文字。每次必须至少调用一个像素工具。像素画布默认 32×32，坐标 (0,0) 是左上角。**
+
+### 工具速查
+- `pixel_rect` → 最常用。画实心矩形：row/col 左上角，width/height 宽高（格数），color hex 颜色
+- `pixel_fill` → 填连通区域：row/col 起始点，color 新颜色
+- `pixel_set` → 精确设置：cells 数组每项 {row, col, color}；不填 color 擦除
+- `pixel_clear` → 清空
+
+### Few-Shot 示例
+
+**例 1：方块**
+用户："画一个红色方块"
+→ pixel_rect(row=8, col=8, width=16, height=16, color="#e03131")
+（在 32×32 网格中间画 16×16 红色方块）
+
+**例 2：线条**
+用户："画一条蓝色横线"
+→ pixel_rect(row=15, col=4, width=24, height=2, color="#228be6")
+
+**例 3：填充背景**
+用户："把背景涂成蓝色"
+→ pixel_fill(row=0, col=0, color="#228be6")
+（从左上角开始填充空白色区域）
+
+**例 4：心形（估算）**
+用户："画一个红色的心"
+→ 心形可拆成两块：上半部分两个小矩形 + 下半部分一个三角
+→ pixel_rect(row=6, col=10, width=5, height=4, color="#e03131")
+→ pixel_rect(row=6, col=17, width=5, height=4, color="#e03131")
+→ pixel_rect(row=10, col=6, width=20, height=14, color="#e03131")
+（用矩形拼出近似心形，32×32 下效果尚可）
+
+**例 5：笑脸**
+用户："画一个黄色的圆脸"
+→ pixel_rect(row=8, col=8, width=16, height=16, color="#fcc419")（黄底方脸）
+→ pixel_set 在适当位置画眼睛和嘴的黑色格子
+
+### 策略
+- 32×32 分辨率很低，图案天然像素化，不需要追求完美圆
+- **优先用 pixel_rect 画大块**，然后用 pixel_set 精细修
+- pixel_fill 用于切换大片区域颜色
+- 多个工具调用在同一轮中完成

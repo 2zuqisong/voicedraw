@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke, listen } from "../lib/apiBridge";
-import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan, PendingAction, CanvasMode, PixelTool, PixelState } from "./types";
+import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan, PendingAction, CanvasMode, PixelState } from "./types";
 import { getLLMApiKey, getLLMEndpoint, getLLMModel } from "../lib/settings";
 
 interface AppState {
@@ -47,13 +47,7 @@ interface AppState {
   canvasMode: CanvasMode;
   pixel: PixelState;
   setCanvasMode: (mode: CanvasMode) => void;
-  setPixelCell: (row: number, col: number, color: string | null) => void;
-  setPixelColor: (color: string) => void;
-  setPixelTool: (tool: PixelTool) => void;
-  setPixelCellSize: (size: number) => void;
-  pixelFloodFill: (row: number, col: number, color: string) => void;
-  clearPixelData: () => void;
-  pixelUndo: () => void;
+  _syncPixelFromCanvas: () => void;
 
   // 内部
   _updateCanvasState: (state: CanvasState) => void;
@@ -67,62 +61,10 @@ const DEFAULT_PIXEL_CELL = 20;
 function createDefaultPixel(): PixelState {
   return {
     data: {},
-    color: "#1a1a1a",
-    tool: "pencil",
     cellSize: DEFAULT_PIXEL_CELL,
     cols: DEFAULT_PIXEL_COLS,
     rows: DEFAULT_PIXEL_ROWS,
-    undoStack: [],
   };
-}
-
-function floodFill(
-  data: Record<string, string>,
-  cols: number,
-  rows: number,
-  startRow: number,
-  startCol: number,
-  fillColor: string,
-): Record<string, string> {
-  const key = `${startRow},${startCol}`;
-  const targetColor = data[key] ?? null;
-
-  // 如果目标颜色和填充颜色相同，无需操作
-  if (targetColor === fillColor) return data;
-
-  const result = { ...data };
-  const stack: [number, number][] = [[startRow, startCol]];
-  const visited = new Set<string>();
-  visited.add(key);
-
-  while (stack.length > 0) {
-    const [r, c] = stack.pop()!;
-    const k = `${r},${c}`;
-    const current = result[k] ?? null;
-
-    if (current === targetColor) {
-      if (fillColor === "" || fillColor === null) {
-        delete result[k];
-      } else {
-        result[k] = fillColor;
-      }
-
-      // 检查四邻域
-      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        const nr = r + dr;
-        const nc = c + dc;
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
-          const nk = `${nr},${nc}`;
-          if (!visited.has(nk)) {
-            visited.add(nk);
-            stack.push([nr, nc]);
-          }
-        }
-      }
-    }
-  }
-
-  return result;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -145,60 +87,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   pixel: createDefaultPixel(),
   setCanvasMode: (mode) => set({ canvasMode: mode }),
 
-  setPixelCell: (row, col, color) => {
-    const { pixel } = get();
-    const key = `${row},${col}`;
-    const prevData = { ...pixel.data };
-    const newData = { ...pixel.data };
-    if (color === null || color === "") {
-      delete newData[key];
-    } else {
-      newData[key] = color;
-    }
-    const undoStack = [...pixel.undoStack, prevData].slice(-30);
-    set({ pixel: { ...pixel, data: newData, undoStack } });
-  },
-
-  setPixelColor: (color) => {
-    const { pixel } = get();
-    set({ pixel: { ...pixel, color } });
-  },
-
-  setPixelTool: (tool) => {
-    const { pixel } = get();
-    set({ pixel: { ...pixel, tool } });
-  },
-
-  setPixelCellSize: (size) => {
-    const { pixel } = get();
-    // 调整网格大小：保持画布尺寸一致
-    const canvasW = pixel.cols * pixel.cellSize;
-    const cols = Math.round(canvasW / size);
-    const rows = Math.round(canvasW / size);
-    set({ pixel: { ...pixel, cellSize: size, cols, rows, undoStack: [] } });
-  },
-
-  pixelFloodFill: (row, col, color) => {
-    const { pixel } = get();
-    const prevData = { ...pixel.data };
-    const newData = floodFill(pixel.data, pixel.cols, pixel.rows, row, col, color);
-    const undoStack = [...pixel.undoStack, prevData].slice(-30);
-    set({ pixel: { ...pixel, data: newData, undoStack } });
-  },
-
-  clearPixelData: () => {
-    const { pixel } = get();
-    const prevData = { ...pixel.data };
-    const undoStack = [...pixel.undoStack, prevData].slice(-30);
-    set({ pixel: { ...pixel, data: {}, undoStack } });
-  },
-
-  pixelUndo: () => {
-    const { pixel } = get();
-    const stack = [...pixel.undoStack];
-    if (stack.length === 0) return;
-    const prevData = stack.pop()!;
-    set({ pixel: { ...pixel, data: prevData, undoStack: stack } });
+  /** 从 canvasState.pixel 同步到本地 Zustand（LLM 修改后触发） */
+  _syncPixelFromCanvas: () => {
+    const cs = get().canvasState;
+    if (!cs?.pixel) return;
+    const prev = get().pixel;
+    set({
+      pixel: {
+        ...prev,
+        data: { ...cs.pixel.cells },
+        cols: cs.pixel.cols,
+        rows: cs.pixel.rows,
+        cellSize: cs.pixel.cell_size,
+      },
+    });
   },
 
   _refreshSnapshotStatus: async () => {
@@ -230,6 +132,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         llmApiKey: getLLMApiKey(),
         llmEndpoint: getLLMEndpoint(),
         llmModel: getLLMModel(),
+        canvasMode: get().canvasMode,
       });
       // 检测导出快捷操作
       if (result.message && result.message.includes("快捷操作: export")) {
@@ -268,6 +171,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           ].slice(-10), // 保留最近10条
         });
         get()._refreshSnapshotStatus();
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", lastOperation: result.message || "操作失败" });
       }
@@ -289,6 +193,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           status: "idle",
           lastOperation: result.message,
         });
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", lastOperation: result.message });
         setTimeout(() => set({ status: "idle" }), 2000);
@@ -317,6 +222,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             { role: "assistant" as const, content: result.message },
           ].slice(-10),
         });
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", pendingPlan: null, lastOperation: result.message || "执行失败" });
         setTimeout(() => set({ status: "idle" }), 3000);
@@ -349,6 +255,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           status: "idle",
           lastOperation: result.message,
         });
+        get()._syncPixelFromCanvas();
       } else {
         set({ status: "error", pendingPlan: null, lastOperation: result.message || "修改失败" });
         setTimeout(() => set({ status: "idle" }), 3000);
@@ -361,13 +268,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setStatus: (status) => set({ status }),
 
-  _updateCanvasState: (state) => set({ canvasState: state }),
+  _updateCanvasState: (state) => {
+    set({ canvasState: state });
+    get()._syncPixelFromCanvas();
+  },
 
   _initEventListener: async () => {
     // 监听 Rust 端推送的 canvas 更新事件
     await listen<CanvasState>("canvas-updated", (event) => {
       set({ canvasState: event.payload, status: "idle", pendingPlan: null });
       get()._refreshSnapshotStatus();
+      get()._syncPixelFromCanvas();
     });
   },
 }));
