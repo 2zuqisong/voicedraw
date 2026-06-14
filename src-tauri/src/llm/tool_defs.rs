@@ -117,7 +117,12 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
                     "node_id": {"type": "string"},
                     "label": {"type": "string"},
                     "fill": {"type": "string", "description": "填充颜色，如 #e8f5e9"},
-                    "stroke": {"type": "string", "description": "边框颜色"}
+                    "stroke": {"type": "string", "description": "边框颜色"},
+                    "font_size": {"type": "number", "description": "字体大小"},
+                    "stroke_width": {"type": "number", "description": "边框粗细"},
+                    "border_radius": {"type": "number", "description": "圆角半径，0为直角"},
+                    "text_color": {"type": "string", "description": "文字颜色，如 #333333"},
+                    "opacity": {"type": "number", "description": "不透明度 0.0-1.0，1.0为完全不透明"}
                 },
                 "required": ["node_id"]
             }),

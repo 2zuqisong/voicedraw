@@ -53,6 +53,20 @@ export interface NodeStyle {
   font_size: number;
   font_family: string;
   border_radius: number;
+  /** 不透明度 0.0–1.0（默认 1.0） */
+  opacity: number;
+  /** 文字颜色（默认 #1a1a1a） */
+  text_color: string;
+  /** 可选阴影 */
+  shadow?: ShadowConfig;
+}
+
+/** 阴影配置 */
+export interface ShadowConfig {
+  color: string;
+  blur: number;
+  offset_x: number;
+  offset_y: number;
 }
 
 /** 复合图形的子组件定义 */
