@@ -667,14 +667,30 @@ fn execute_tool_call(
             let label = args["label"].as_str().map(|s| s.to_string());
             let fill = args["fill"].as_str().map(|s| s.to_string());
             let stroke = args["stroke"].as_str().map(|s| s.to_string());
-            // 更新样式
-            if let Some(f) = fill {
+            let font_size = args["font_size"].as_f64();
+            let stroke_width = args["stroke_width"].as_f64();
+            let border_radius = args["border_radius"].as_f64();
+            let text_color = args["text_color"].as_str().map(|s| s.to_string());
+            let opacity = args["opacity"].as_f64();
+            // 更新样式：只要任意样式参数有值就调用
+            let has_style = fill.is_some()
+                || stroke.is_some()
+                || font_size.is_some()
+                || stroke_width.is_some()
+                || border_radius.is_some()
+                || text_color.is_some()
+                || opacity.is_some();
+            if has_style {
                 crate::engine::style_ops::set_element_style(
                     &mut state.nodes,
                     node_id,
-                    Some(f),
+                    fill,
                     stroke,
-                    None,
+                    font_size,
+                    stroke_width,
+                    border_radius,
+                    text_color,
+                    opacity,
                 )
                 .map_err(|e| format!("{}", e))?;
             }

@@ -129,15 +129,18 @@ export function renderCompositeShape(
 
   // label 放在图形上方中央
   if (label && label.length > 0) {
-    const text = new fabric.Text(label, {
+    const effectiveTextColor = style.text_color || "#1a1a1a";
+    const text = new fabric.Textbox(label, {
       left: position.x + size.width / 2,
       top: position.y - 24,
+      width: size.width + 16,
       fontSize: style.font_size,
       fontFamily: style.font_family,
-      fill: "#1a1a1a",
+      fill: effectiveTextColor,
       originX: "center",
       originY: "bottom",
       textAlign: "center",
+      splitByGrapheme: true,
     });
     objects.push(text);
   }

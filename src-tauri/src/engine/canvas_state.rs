@@ -77,6 +77,15 @@ pub struct Size {
     pub height: f64,
 }
 
+/// 阴影配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShadowConfig {
+    pub color: String,
+    pub blur: f64,
+    pub offset_x: f64,
+    pub offset_y: f64,
+}
+
 /// 节点样式
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeStyle {
@@ -86,6 +95,22 @@ pub struct NodeStyle {
     pub font_size: f64,
     pub font_family: String,
     pub border_radius: f64,
+    /// 不透明度 0.0–1.0（默认 1.0）
+    #[serde(default = "default_opacity")]
+    pub opacity: f64,
+    /// 文字颜色（默认 #1a1a1a）
+    #[serde(default = "default_text_color")]
+    pub text_color: String,
+    /// 可选阴影
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shadow: Option<ShadowConfig>,
+}
+
+fn default_opacity() -> f64 {
+    1.0
+}
+fn default_text_color() -> String {
+    "#1a1a1a".into()
 }
 
 impl Default for NodeStyle {
@@ -97,6 +122,9 @@ impl Default for NodeStyle {
             font_size: 14.0,
             font_family: "sans-serif".into(),
             border_radius: 8.0,
+            opacity: 1.0,
+            text_color: "#1a1a1a".into(),
+            shadow: None,
         }
     }
 }

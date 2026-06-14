@@ -359,6 +359,26 @@ function renderGrid(
   });
 }
 
+/** 将 opacity 和 shadow 应用到 fabric Group */
+function applyNodeStyleOverrides(
+  group: fabric.Group,
+  style: { opacity?: number; shadow?: { color: string; blur: number; offset_x: number; offset_y: number } },
+): void {
+  if (style.opacity !== undefined && style.opacity < 1.0) {
+    group.set({ opacity: style.opacity });
+  }
+  if (style.shadow) {
+    group.set({
+      shadow: new fabric.Shadow({
+        color: style.shadow.color,
+        blur: style.shadow.blur,
+        offsetX: style.shadow.offset_x,
+        offsetY: style.shadow.offset_y,
+      }),
+    });
+  }
+}
+
 /** 将 CanvasState 渲染到 Fabric.js（不清除网格线） */
 function renderCanvasState(
   canvas: fabric.Canvas,
@@ -399,6 +419,7 @@ function renderNode(
   // --- Composite shapes: render as fabric.Group (label handled inside ShapeRenderer) ---
   if (shape_type && isCompositeShape(shape_type)) {
     const group = renderCompositeShape(node);
+    applyNodeStyleOverrides(group, style);
     (group as any).data = { nodeId: node.id, nodeType: node_type, shapeType: shape_type };
     canvas.add(group);
     return;
@@ -407,21 +428,25 @@ function renderNode(
   // --- Basic geometric shapes: single fabric object + label ---
   if (shape_type && isBasicShape(shape_type)) {
     const shape = renderBasicShape(node);
-    const text = new fabric.Text(label, {
+    const effectiveTextColor = style.text_color || "#1a1a1a";
+    const text = new fabric.Textbox(label, {
       left: position.x + size.width / 2,
       top: position.y + size.height / 2,
+      width: size.width - 8,
       fontSize: style.font_size,
       fontFamily: style.font_family,
-      fill: "#1a1a1a",
+      fill: effectiveTextColor,
       originX: "center",
       originY: "center",
       textAlign: "center",
+      splitByGrapheme: true,
     });
 
     const group = new fabric.Group([shape, text], {
       left: position.x,
       top: position.y,
     });
+    applyNodeStyleOverrides(group, style);
     (group as any).data = { nodeId: node.id, nodeType: node_type, shapeType: shape_type };
     canvas.add(group);
     return;
@@ -493,21 +518,25 @@ function renderNode(
       });
   }
 
-  const text = new fabric.Text(label, {
+  const effectiveTextColor = style.text_color || "#1a1a1a";
+  const text = new fabric.Textbox(label, {
     left: position.x + size.width / 2,
     top: position.y + size.height / 2,
+    width: size.width - 8,
     fontSize: style.font_size,
     fontFamily: style.font_family,
-    fill: "#1a1a1a",
+    fill: effectiveTextColor,
     originX: "center",
     originY: "center",
     textAlign: "center",
+    splitByGrapheme: true,
   });
 
   const group = new fabric.Group([shape, text], {
     left: position.x,
     top: position.y,
   });
+  applyNodeStyleOverrides(group, style);
   (group as any).data = { nodeId: node.id, nodeType: node_type };
 
   canvas.add(group);
@@ -597,12 +626,15 @@ function renderEdge(
   canvas.add(arrow);
 
   if (edge.label) {
-    const label = new fabric.Text(edge.label, {
+    const label = new fabric.Textbox(edge.label, {
       left: (fromX + toX) / 2,
       top: (fromY + toY) / 2 - 16,
-      fontSize: 12,
-      fill: "#666",
-      backgroundColor: "#fafafa",
+      fontSize: 11,
+      fill: "#555555",
+      originX: "center",
+      originY: "bottom",
+      textAlign: "center",
+      splitByGrapheme: true,
     });
     canvas.add(label);
   }
