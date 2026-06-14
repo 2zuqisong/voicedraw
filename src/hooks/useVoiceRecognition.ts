@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface UseVoiceRecognitionOptions {
   onResult: (text: string, isFinal: boolean) => void;
@@ -11,16 +11,23 @@ function isSpeechSupported(): boolean {
   return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 }
 
+/**
+ * 语音识别 hook。
+ * 关键优化：recognition 实例挂载时即启动并持续运行，
+ * "开始/停止"只切换结果捕获开关，消除每次 start() 的音频流初始化延迟。
+ */
 export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
   const { onResult, onError, onEnd, lang = "zh-CN" } = options;
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // true = 正在捕获结果（用户点了麦克风）
+  const capturingRef = useRef(false);
+  // 累积文本
+  const transcriptRef = useRef("");
 
-  const start = useCallback(() => {
+  // 挂载时启动 recognition，卸载时停止
+  useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      onError("浏览器不支持语音识别，请使用 Chrome 浏览器。");
-      return;
-    }
+    if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
     recognition.lang = lang;
@@ -29,45 +36,58 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      // 从 0 遍历全部累积结果（而非 event.resultIndex），确保停顿前后的
-      // 语音内容被完整拼接，不会因中途暂停而被覆盖。
-      let transcript = "";
-      let isFinal = false;
+      if (!capturingRef.current) return;
+      let t = "";
+      let final = false;
       for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          isFinal = true;
-        }
+        t += event.results[i][0].transcript;
+        if (event.results[i].isFinal) final = true;
       }
-      onResult(transcript, isFinal);
+      transcriptRef.current = t;
+      onResult(t, final);
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      // 'no-speech' 和 'aborted' 是正常结束，不算错误
-      if (event.error !== "no-speech" && event.error !== "aborted") {
-        onError(`语音识别错误: ${event.error}`);
-      }
+      if (event.error === "no-speech" || event.error === "aborted") return;
+      onError(`语音识别错误: ${event.error}`);
     };
 
     recognition.onend = () => {
+      // continuous=true 时，onend 通常在 abort 后触发
+      // 如果不是主动 abort（capturing 为 true 时意外断开），尝试重启
+      if (capturingRef.current) {
+        try { recognition.start(); } catch { /* 忽略 */ }
+      }
       onEnd();
     };
 
     recognition.start();
     recognitionRef.current = recognition;
-  }, [lang, onResult, onError, onEnd]);
+
+    return () => {
+      try { recognition.abort(); } catch { /* 忽略 */ }
+    };
+  }, [lang]); // 只挂载一次
+
+  const start = useCallback(() => {
+    capturingRef.current = true;
+    transcriptRef.current = "";
+  }, []);
 
   const stop = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
+    capturingRef.current = false;
   }, []);
 
   const abort = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.abort();
-      recognitionRef.current = null;
+    capturingRef.current = false;
+    transcriptRef.current = "";
+    // 重启 recognition 清空内部缓冲区
+    const r = recognitionRef.current;
+    if (r) {
+      try { r.abort(); } catch { /* 忽略 */ }
+      setTimeout(() => {
+        try { r.start(); } catch { /* 忽略 */ }
+      }, 50);
     }
   }, []);
 
