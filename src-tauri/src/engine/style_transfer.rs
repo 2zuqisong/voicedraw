@@ -60,6 +60,32 @@ struct TaskImage {
     url: String,
 }
 
+// ── Helpers ────────────────────────────────────────────────────
+
+/// 带重试的图片下载（解决 OSS 偶发连接失败）
+async fn download_with_retry(
+    client: &reqwest::Client,
+    url: &str,
+    max_retries: u32,
+) -> Result<Vec<u8>, String> {
+    let mut last_err = String::new();
+    for attempt in 0..max_retries {
+        if attempt > 0 {
+            let delay = std::time::Duration::from_secs(attempt as u64);
+            log::info!("下载重试 {}/{} (等待 {}s)...", attempt + 1, max_retries, delay.as_secs());
+            tokio::time::sleep(delay).await;
+        }
+        match client.get(url).timeout(std::time::Duration::from_secs(30)).send().await {
+            Ok(resp) => match resp.bytes().await {
+                Ok(b) => return Ok(b.to_vec()),
+                Err(e) => last_err = format!("读取响应字节失败: {}", e),
+            },
+            Err(e) => last_err = format!("请求失败: {}", e),
+        }
+    }
+    Err(format!("重试 {} 次后仍然失败: {}", max_retries, last_err))
+}
+
 // ── Public API ─────────────────────────────────────────────────
 
 /// 调用 DashScope 通义万相 API 进行图像风格转换。
@@ -129,15 +155,11 @@ pub async fn apply_style_transfer(
                     .ok_or_else(|| "结果图片列表为空".to_string())?
                     .url;
 
-                // 3. 下载结果图片并转为 base64
-                let image_bytes = client
-                    .get(image_url)
-                    .send()
+                // 3. 下载结果图片并转为 base64（含重试）
+                log::info!("下载结果图片: {}", image_url);
+                let image_bytes = download_with_retry(&client, image_url, 3)
                     .await
-                    .map_err(|e| format!("下载结果图片失败: {}", e))?
-                    .bytes()
-                    .await
-                    .map_err(|e| format!("读取图片数据失败: {}", e))?;
+                    .map_err(|e| format!("下载结果图片失败 (URL: {}): {}", image_url, e))?;
 
                 use base64::Engine;
                 let b64 = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
