@@ -242,24 +242,10 @@ function renderNode(
 ): void {
   const { position, size, style, label, node_type, shape_type } = node;
 
-  // --- Composite shapes: render as fabric.Group from sub_shapes ---
+  // --- Composite shapes: render as fabric.Group (label handled inside ShapeRenderer) ---
   if (shape_type && isCompositeShape(shape_type)) {
     const group = renderCompositeShape(node);
     (group as any).data = { nodeId: node.id, nodeType: node_type, shapeType: shape_type };
-
-    if (label && label.length > 0) {
-      const text = new fabric.Text(label, {
-        left: 0,
-        top: -22,
-        fontSize: style.font_size,
-        fontFamily: style.font_family,
-        fill: "#1a1a1a",
-        textAlign: "center",
-      });
-      text.set({ left: (node.size.width - text.width) / 2 });
-      group.add(text);
-    }
-
     canvas.add(group);
     return;
   }

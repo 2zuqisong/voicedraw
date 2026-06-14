@@ -95,39 +95,54 @@ export function renderBasicShape(
 }
 
 /**
- * 渲染复合图形，返回 fabric.Group
+ * 渲染复合图形，返回 fabric.Group（含 label）
  */
 export function renderCompositeShape(
   node: DiagramNode,
 ): fabric.Group {
-  const subShapes = node.sub_shapes;
+  const { position, size, style, label, sub_shapes: subShapes } = node;
   const objects: fabric.Object[] = [];
 
   if (!subShapes || subShapes.length === 0) {
     return new fabric.Group([
       new fabric.Rect({
-        width: node.size.width,
-        height: node.size.height,
-        fill: node.style.fill,
-        stroke: node.style.stroke,
-        strokeWidth: node.style.stroke_width,
+        width: size.width,
+        height: size.height,
+        fill: style.fill,
+        stroke: style.stroke,
+        strokeWidth: style.stroke_width,
       }),
     ]);
   }
 
+  // 子组件使用绝对画布坐标
   for (const sub of subShapes) {
     const obj = renderSubShape(sub);
     if (obj) {
-      // 使用绝对画布坐标，让 Fabric Group 正确处理内部坐标变换
       obj.set({
-        left: node.position.x + sub.rel_x,
-        top: node.position.y + sub.rel_y,
+        left: position.x + sub.rel_x,
+        top: position.y + sub.rel_y,
       });
       objects.push(obj);
     }
   }
 
-  // 不传 left/top，让 Fabric 根据子对象绝对坐标自动计算 Group 位置
+  // label 放在图形上方中央
+  if (label && label.length > 0) {
+    const text = new fabric.Text(label, {
+      left: position.x + size.width / 2,
+      top: position.y - 24,
+      fontSize: style.font_size,
+      fontFamily: style.font_family,
+      fill: "#1a1a1a",
+      originX: "center",
+      originY: "bottom",
+      textAlign: "center",
+    });
+    objects.push(text);
+  }
+
+  // Fabric 根据所有对象（含 label）的绝对坐标自动计算 Group 位置和包围盒
   return new fabric.Group(objects);
 }
 
@@ -168,10 +183,9 @@ function renderSubShape(sub: SubShape): fabric.Object | null {
     }
 
     case "line": {
-      const cx = sub.width / 2;
-      const cy = sub.height / 2;
+      // 从 bounding box 左上角到右下角，覆盖所有方向的射线
       return new fabric.Line(
-        [cx, cy - sub.height / 2, cx, cy + sub.height / 2],
+        [0, 0, sub.width, sub.height],
         {
           stroke: sub.stroke,
           strokeWidth: sub.stroke_width,
