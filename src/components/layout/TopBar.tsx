@@ -64,7 +64,7 @@ export default function TopBar() {
           top: 16,
           left: "50%",
           transform: "translateX(-50%)",
-          zIndex: 80,
+          zIndex: 110,
           display: "flex",
           background: "var(--surface, #fff)",
           border: "1px solid var(--border, #d4d4ce)",
