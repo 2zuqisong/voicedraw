@@ -214,7 +214,12 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
         // Step 3: 调用 Tauri command
         const result = await invoke<StyleTransferResult>(
           "apply_style_transfer",
-          { imageBase64: imageDataUrl, prompt, nodeIds },
+          {
+            imageBase64: imageDataUrl,
+            prompt,
+            nodeIds,
+            dashscopeKey: localStorage.getItem("vtod_dashscope_api_key") || undefined,
+          },
         );
 
         logStyleTransfer("风格转换完成，应用结果到画布...");

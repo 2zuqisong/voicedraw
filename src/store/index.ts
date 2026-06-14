@@ -3,6 +3,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan, PendingAction } from "./types";
 
+/** localStorage keys (mirrored in SettingsPanel.tsx) */
+const DEEPSEEK_KEY = "vtod_deepseek_api_key";
+
+function getDeepseekKey(): string | undefined {
+  const key = localStorage.getItem(DEEPSEEK_KEY);
+  return key || undefined;
+}
+
 interface AppState {
   // 语音状态
   isListening: boolean;
@@ -67,7 +75,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   submitCommand: async (text) => {
     set({ status: "thinking", lastOperation: text });
     try {
-      const result = await invoke<OperationResult>("process_command", { text });
+      const result = await invoke<OperationResult>("process_command", { text, deepseekKey: getDeepseekKey() });
       if (result.pending_plan) {
         // 复杂指令：显示预览面板
         set({
