@@ -278,10 +278,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   _initEventListener: async () => {
-    // 监听 Rust 端推送的 canvas 更新事件
+    // 监听 Rust 端推送的 canvas 更新事件（最终结果）
     await listen<CanvasState>("canvas-updated", (event) => {
       set({ canvasState: event.payload, status: "idle", pendingPlan: null });
       get()._refreshSnapshotStatus();
+      get()._syncPixelFromCanvas();
+    });
+    // 监听中间进度事件（LLM 每轮工具调用后），实时刷新画布
+    await listen<CanvasState>("canvas-progress", (event) => {
+      set({ canvasState: event.payload });
       get()._syncPixelFromCanvas();
     });
   },
