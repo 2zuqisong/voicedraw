@@ -23,6 +23,37 @@ const DEFAULT_GRID = {
   grid_origin_y: 24,
 };
 
+/** 模块级 canvas 引用，供导出等功能使用 */
+let _activeCanvas: fabric.Canvas | null = null;
+
+/** 导出画布为 PNG 或 SVG 文件 */
+export function exportCanvas(format: "png" | "svg"): boolean {
+  const canvas = _activeCanvas;
+  if (!canvas) return false;
+
+  const title = "未命名图表";
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const filename = `${title}-${ts}.${format}`;
+
+  if (format === "svg") {
+    const svg = canvas.toSVG();
+    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  } else {
+    const dataUrl = canvas.toDataURL({ format: "png", multiplier: 2 });
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = filename;
+    a.click();
+  }
+  return true;
+}
+
 export default function CanvasView({ canvasState }: CanvasViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,6 +70,7 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
 
     const { canvas, cleanup } = initFabricCanvas(canvasRef.current, w, h);
     fabricRef.current = canvas;
+    _activeCanvas = canvas;
     renderGrid(canvas, w, h);
 
     // ResizeObserver：容器大小变化时更新画布和网格
@@ -120,6 +152,19 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
       renderCanvasState(canvas, canvasState);
     }
   }, [canvasState]);
+
+  // 检测导出信号
+  const exportFormat = useAppStore((s) => s.exportFormat);
+  const clearExport = useAppStore((s) => s.clearExport);
+
+  useEffect(() => {
+    if (!exportFormat) return;
+    const ok = exportCanvas(exportFormat as "png" | "svg");
+    if (ok) {
+      console.log(`[导出] 已导出 ${exportFormat.toUpperCase()}`);
+    }
+    clearExport();
+  }, [exportFormat, clearExport]);
 
   // 检测 pendingAction（如风格转换），执行前端侧操作
   const pendingAction = useAppStore((s) => s.pendingAction);

@@ -27,6 +27,10 @@ interface AppState {
   pendingAction: PendingAction | null;
   clearPendingAction: () => void;
 
+  // 导出信号
+  exportFormat: string | null;
+  clearExport: () => void;
+
   // 动作
   startListening: () => void;
   stopListening: () => void;
@@ -50,6 +54,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingPlan: null,
   pendingAction: null,
   clearPendingAction: () => set({ pendingAction: null }),
+  exportFormat: null,
+  clearExport: () => set({ exportFormat: null }),
 
   startListening: () => set({ isListening: true, status: "listening", transcript: "" }),
   
@@ -69,6 +75,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ status: "thinking", lastOperation: text });
     try {
       const result = await invoke<OperationResult>("process_command", { text, deepseekKey: getLLMApiKey() });
+      // 检测导出快捷操作
+      if (result.message && result.message.includes("快捷操作: export")) {
+        const fmt = text.includes("SVG") || text.includes("svg") ? "svg" : "png";
+        set({ exportFormat: fmt, status: "idle", lastOperation: `正在导出 ${fmt.toUpperCase()}...` });
+        return;
+      }
       if (result.pending_plan) {
         // 复杂指令：显示预览面板
         set({

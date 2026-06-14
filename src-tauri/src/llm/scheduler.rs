@@ -767,6 +767,37 @@ fn execute_tool_call(
             state.theme = theme;
             Ok(serde_json::json!({"success": true}).to_string())
         }
+        "apply_template" => {
+            let name = args["template"].as_str().ok_or("缺少 template")?;
+            let grid_x = args["grid_x"].as_f64().unwrap_or(10.0);
+            let grid_y = args["grid_y"].as_f64().unwrap_or(5.0);
+            let title = args["title"].as_str();
+            let template = crate::engine::templates::get_template(name)
+                .ok_or(format!("未知模板: {}", name))?;
+            let grid_cfg = crate::engine::grid::GridConfig::default();
+            let (ox, oy) = grid_cfg.grid_to_pixel(grid_x, grid_y);
+            let (nodes, edges) =
+                crate::engine::templates::instantiate_template(template, ox, oy, title);
+            let count = nodes.len() + edges.len();
+            for node in nodes {
+                state.nodes.insert(node.id.clone(), node);
+            }
+            for edge in edges {
+                state.edges.insert(edge.id.clone(), edge);
+            }
+            // 自动排列
+            let moved = crate::engine::layout::auto_layout(
+                &mut state.nodes,
+                &state.edges,
+                crate::engine::layout::LayoutDirection::TopDown,
+            );
+            Ok(serde_json::json!({
+                "template": name,
+                "count": count,
+                "moved": moved
+            })
+            .to_string())
+        }
         "get_canvas_state" => Ok(
             serde_json::to_string(&*state).unwrap_or_else(|_| "{}".into()),
         ),
