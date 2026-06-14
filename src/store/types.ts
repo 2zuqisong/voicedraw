@@ -1,5 +1,6 @@
 // 与 Rust CanvasState 对应的前端类型
 
+// NodeType stays exactly as-is — flowchart types only
 export type NodeType =
   | "Start"
   | "End"
@@ -8,6 +9,21 @@ export type NodeType =
   | "Data"
   | "Subprocess"
   | "Text";
+
+// NEW: ShapeType — geometric and composite shapes (parallel to NodeType)
+export type ShapeType =
+  // Basic geometric shapes
+  | "Circle"
+  | "Rectangle"
+  | "Triangle"
+  | "Line"
+  | "Dot"
+  // Composite shapes
+  | "House"
+  | "Sun"
+  | "Tree"
+  | "Smiley"
+  | "Star";
 
 export type Theme =
   | "Default"
@@ -39,6 +55,19 @@ export interface NodeStyle {
   border_radius: number;
 }
 
+/** 复合图形的子组件定义 */
+export interface SubShape {
+  shape_type: string;
+  rel_x: number;
+  rel_y: number;
+  width: number;
+  height: number;
+  fill: string;
+  stroke: string;
+  stroke_width: number;
+  radius?: number;
+}
+
 export interface EdgeStyle {
   line_style: LineStyle;
   arrow: ArrowType;
@@ -49,10 +78,14 @@ export interface EdgeStyle {
 export interface DiagramNode {
   id: string;
   node_type: NodeType;
+  /** 几何图形类型（与 node_type 并列，二选一；渲染时优先检查此字段） */
+  shape_type?: ShapeType;
   label: string;
   position: Position;
   size: Size;
   style: NodeStyle;
+  /** 复合图形的子组件列表（非复合图形为 undefined） */
+  sub_shapes?: SubShape[];
 }
 
 export interface DiagramEdge {
