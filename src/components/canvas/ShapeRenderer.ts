@@ -252,7 +252,11 @@ function createStarPolygon(sub: SubShape): fabric.Polygon {
 
 /** 判断 shape_type 是否为复合图形 */
 export function isCompositeShape(shapeType: string): boolean {
-  return ["House", "Sun", "Tree", "Smiley", "Star"].includes(shapeType);
+  return [
+    "House", "Sun", "Tree", "Smiley", "Star",
+    "Cake", "Gift", "Balloon", "Candle", "Heart",
+    "Flower", "ArrowShape", "SpeechBubble", "Cloud", "Lightning",
+  ].includes(shapeType);
 }
 
 /** 判断 shape_type 是否为基本几何图形 */

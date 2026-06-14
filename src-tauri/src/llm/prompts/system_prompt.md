@@ -40,8 +40,19 @@
 - "画树"/"画一棵绿色的树" → shape_type="tree"
 - "画笑脸"/"画一个笑脸" → shape_type="smiley"
 - "画星星"/"画一个五角星" → shape_type="star"
+- "画蛋糕"/"画一个生日蛋糕" → shape_type="cake"
+- "画礼物盒"/"画礼物" → shape_type="gift"
+- "画气球"/"画一个红色气球" → shape_type="balloon"
+- "画蜡烛" → shape_type="candle"
+- "画爱心"/"画一个心形" → shape_type="heart"
+- "画花朵"/"画一朵花" → shape_type="flower"
+- "画箭头"/"画一个指向右边的箭头" → shape_type="arrow_shape"
+- "画对话气泡"/"画气泡框" → shape_type="speech_bubble"
+- "画云朵"/"画一朵云" → shape_type="cloud"
+- "画闪电" → shape_type="lightning"
 
 重要区分：几何图形用 shape_type，流程图用 type。两者不混用。
+复合图形的颜色可通过 fill 参数自定义（如"画一个粉色蛋糕"→fill="#ec407a"），系统会自动推导子组件配色。
 
 ## 坐标口语化支持
 支持以下相对位置词，自动转换为网格坐标：
@@ -258,6 +269,31 @@
   ] grid_x=2 grid_y=10
   [auto_layout] direction="left_right"
 回复: "已画出笑脸和五角星，左右排列。"
+
+### 示例 11b：贺卡组合
+用户: "画一个生日贺卡：蛋糕在中间，左边一个气球，右边一个礼物盒"
+助手思考: 三个复合图形 + 标题文字。蛋糕居中，气球左，礼物右。
+工具调用:
+  [add_nodes_batch] nodes=[
+    {"shape_type":"cake","label":"生日快乐","fill":"#ffab91"},
+    {"shape_type":"balloon","label":"气球","fill":"#e53935"},
+    {"shape_type":"gift","label":"礼物","fill":"#42a5f5"}
+  ] grid_x=10 grid_y=5
+  [auto_layout] direction="left_right"
+回复: "已画出生日贺卡：蛋糕居中，气球和礼物在两旁。"
+
+### 示例 11c：正交连线
+用户: "画用户登录流程，用直角连线"
+助手思考: 直角连线需在每个 edge 上指定 routing="orthogonal"。
+工具调用:
+  [add_nodes_batch] nodes=[开始/输入/验证/成功/失败]
+  [add_edges_batch] edges=[
+    {"from":"<n1>","to":"<n2>","routing":"orthogonal"},
+    {"from":"<n2>","to":"<n3>","routing":"orthogonal"},
+    ...
+  ]
+  [auto_layout]
+回复: "已画出登录流程，使用直角连线。"
 
 ### 示例 12：风格转换——整个画布
 用户: "把这个画变成梵高风格"

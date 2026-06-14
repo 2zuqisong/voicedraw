@@ -43,6 +43,16 @@ pub enum ShapeType {
     Tree,
     Smiley,
     Star,
+    Cake,
+    Gift,
+    Balloon,
+    Candle,
+    Heart,
+    Flower,
+    ArrowShape,
+    SpeechBubble,
+    Cloud,
+    Lightning,
 }
 
 impl ShapeType {
@@ -58,6 +68,16 @@ impl ShapeType {
             "tree" => Ok(Self::Tree),
             "smiley" => Ok(Self::Smiley),
             "star" => Ok(Self::Star),
+            "cake" => Ok(Self::Cake),
+            "gift" => Ok(Self::Gift),
+            "balloon" => Ok(Self::Balloon),
+            "candle" => Ok(Self::Candle),
+            "heart" => Ok(Self::Heart),
+            "flower" => Ok(Self::Flower),
+            "arrow_shape" => Ok(Self::ArrowShape),
+            "speech_bubble" => Ok(Self::SpeechBubble),
+            "cloud" => Ok(Self::Cloud),
+            "lightning" => Ok(Self::Lightning),
             _ => Err(format!("未知图形类型: {}", s)),
         }
     }
@@ -158,6 +178,7 @@ pub struct SubShape {
 pub struct EdgeStyle {
     pub line_style: LineStyle,
     pub arrow: ArrowType,
+    pub routing: RoutingMode,
     pub stroke: String,
     pub stroke_width: f64,
 }
@@ -176,11 +197,18 @@ pub enum ArrowType {
     None,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum RoutingMode {
+    Straight,
+    Orthogonal,
+}
+
 impl Default for EdgeStyle {
     fn default() -> Self {
         Self {
             line_style: LineStyle::Solid,
             arrow: ArrowType::Single,
+            routing: RoutingMode::Straight,
             stroke: "#555555".into(),
             stroke_width: 2.0,
         }
@@ -212,6 +240,9 @@ pub struct DiagramEdge {
     pub to_id: String,
     pub label: Option<String>,
     pub style: EdgeStyle,
+    /// 正交路由的拐点（仅 routing=Orthogonal 时使用；None 时前端自动计算）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waypoints: Option<Vec<Position>>,
 }
 
 /// 主题

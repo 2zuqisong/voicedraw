@@ -17,6 +17,7 @@ pub fn add_edge(
         to_id: to_id.to_string(),
         label,
         style: style.unwrap_or_default(),
+        waypoints: None,
     };
     edges.insert(id, edge.clone());
     Ok(edge)
