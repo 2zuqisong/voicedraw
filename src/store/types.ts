@@ -175,3 +175,28 @@ export interface StyleTransferResult {
   /** 原节点 ID 列表（前端需移除这些节点） */
   replaced_node_ids: string[];
 }
+
+// ── 可扩展设置模型 ────────────────────────────────────────────
+
+/** 单个 API 厂商配置 */
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  api_key: string;
+  endpoint: string;
+  model: string;
+}
+
+/** 厂商组（LLM 或图像生成） */
+export interface ProviderGroup {
+  /** 当前激活的厂商 ID */
+  active: string;
+  /** 所有可用厂商，key 为厂商 ID */
+  providers: Record<string, ProviderConfig>;
+}
+
+/** 应用设置（持久化到 localStorage） */
+export interface AppSettings {
+  llm: ProviderGroup;
+  image: ProviderGroup;
+}

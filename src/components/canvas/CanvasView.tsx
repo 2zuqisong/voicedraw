@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { initFabricCanvas } from "../../lib/fabric-setup";
 import type { CanvasState, StyleTransferResult } from "../../store/types";
 import { useAppStore } from "../../store";
+import { getImageApiKey } from "../../lib/settings";
 import {
   renderBasicShape,
   renderCompositeShape,
@@ -218,7 +219,7 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
             imageBase64: imageDataUrl,
             prompt,
             nodeIds,
-            dashscopeKey: localStorage.getItem("vtod_dashscope_api_key") || undefined,
+            dashscopeKey: getImageApiKey(),
           },
         );
 

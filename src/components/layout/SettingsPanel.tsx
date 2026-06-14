@@ -1,56 +1,186 @@
 import { useState, useEffect } from "react";
-
-/** localStorage keys */
-const DEEPSEEK_KEY = "vtod_deepseek_api_key";
-const DASHSCOPE_KEY = "vtod_dashscope_api_key";
+import type { AppSettings, ProviderConfig } from "../../store/types";
+import { loadSettings, saveSettings } from "../../lib/settings";
 
 interface SettingsPanelProps {
   open: boolean;
   onClose: () => void;
 }
 
-/** 获取持久化的 API Key */
-export function getStoredApiKeys(): { deepseek: string; dashscope: string } {
-  return {
-    deepseek: localStorage.getItem(DEEPSEEK_KEY) || "",
-    dashscope: localStorage.getItem(DASHSCOPE_KEY) || "",
-  };
+// ── 通用输入样式 ──────────────────────────────────────────────
+
+const fieldStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  fontSize: 14,
+  fontFamily: "var(--font-mono)",
+  border: "1px solid var(--border, #e2e2de)",
+  borderRadius: "var(--radius, 0)",
+  background: "var(--bg, #fafafa)",
+  color: "var(--text-primary)",
+  outline: "none",
+};
+
+const selectStyle: React.CSSProperties = {
+  ...fieldStyle,
+  cursor: "pointer",
+  appearance: "none",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 12,
+  fontWeight: 500,
+  marginBottom: 4,
+  color: "var(--text-secondary)",
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+};
+
+// ── 厂商配置区块 ──────────────────────────────────────────────
+
+function ProviderSection({
+  title,
+  desc,
+  providers,
+  activeId,
+  onActiveChange,
+  onProviderChange,
+}: {
+  title: string;
+  desc: string;
+  providers: ProviderConfig[];
+  activeId: string;
+  onActiveChange: (id: string) => void;
+  onProviderChange: (id: string, patch: Partial<ProviderConfig>) => void;
+}) {
+  const active = providers.find((p) => p.id === activeId) ?? providers[0];
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{
+        fontSize: 14,
+        fontWeight: 600,
+        marginBottom: 2,
+        color: "var(--text-primary)",
+      }}>
+        {title}
+      </div>
+      <div style={{
+        fontSize: 12,
+        marginBottom: 14,
+        color: "var(--text-secondary)",
+        lineHeight: 1.5,
+      }}>
+        {desc}
+      </div>
+
+      {/* 厂商选择 */}
+      <label style={labelStyle}>厂商</label>
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <select
+          value={activeId}
+          onChange={(e) => onActiveChange(e.target.value)}
+          style={selectStyle}
+        >
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+        {/* custom dropdown arrow */}
+        <span style={{
+          position: "absolute",
+          right: 12,
+          top: "50%",
+          transform: "translateY(-50%)",
+          pointerEvents: "none",
+          fontSize: 10,
+          color: "var(--text-secondary)",
+        }}>
+          ▼
+        </span>
+      </div>
+
+      {/* API Key */}
+      <label style={labelStyle}>API Key</label>
+      <input
+        type="password"
+        value={active.api_key}
+        onChange={(e) => onProviderChange(active.id, { api_key: e.target.value })}
+        placeholder="sk-..."
+        style={{ ...fieldStyle, marginBottom: 14 }}
+      />
+
+      {/* Endpoint */}
+      <label style={labelStyle}>Endpoint</label>
+      <input
+        type="text"
+        value={active.endpoint}
+        onChange={(e) => onProviderChange(active.id, { endpoint: e.target.value })}
+        style={{ ...fieldStyle, marginBottom: 14 }}
+      />
+
+      {/* Model */}
+      <label style={labelStyle}>Model</label>
+      <input
+        type="text"
+        value={active.model}
+        onChange={(e) => onProviderChange(active.id, { model: e.target.value })}
+        style={fieldStyle}
+      />
+    </div>
+  );
 }
 
+// ── 主面板 ────────────────────────────────────────────────────
+
 export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
-  const [deepseek, setDeepseek] = useState("");
-  const [dashscope, setDashscope] = useState("");
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // 打开时加载已保存的值
+  // 打开时加载
   useEffect(() => {
     if (open) {
-      setDeepseek(localStorage.getItem(DEEPSEEK_KEY) || "");
-      setDashscope(localStorage.getItem(DASHSCOPE_KEY) || "");
+      setSettings(loadSettings());
       setSaved(false);
     }
   }, [open]);
 
+  if (!open || !settings) return null;
+
+  const llmProviders = Object.values(settings.llm.providers);
+  const imgProviders = Object.values(settings.image.providers);
+
+  const updateProvider = (
+    group: "llm" | "image",
+    providerId: string,
+    patch: Partial<ProviderConfig>,
+  ) => {
+    setSettings((prev) => {
+      if (!prev) return prev;
+      const groupData = prev[group];
+      return {
+        ...prev,
+        [group]: {
+          ...groupData,
+          providers: {
+            ...groupData.providers,
+            [providerId]: { ...groupData.providers[providerId], ...patch },
+          },
+        },
+      };
+    });
+  };
+
   const handleSave = () => {
-    if (deepseek.trim()) {
-      localStorage.setItem(DEEPSEEK_KEY, deepseek.trim());
-    } else {
-      localStorage.removeItem(DEEPSEEK_KEY);
-    }
-    if (dashscope.trim()) {
-      localStorage.setItem(DASHSCOPE_KEY, dashscope.trim());
-    } else {
-      localStorage.removeItem(DASHSCOPE_KEY);
-    }
+    saveSettings(settings);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  if (!open) return null;
-
   return (
     <>
-      {/* backdrop */}
       <div
         onClick={onClose}
         style={{
@@ -61,7 +191,6 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
         }}
       />
 
-      {/* panel */}
       <div
         style={{
           position: "fixed",
@@ -69,7 +198,9 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           left: "50%",
           transform: "translate(-50%, -50%)",
           zIndex: 201,
-          width: 420,
+          width: 460,
+          maxHeight: "85vh",
+          overflowY: "auto",
           background: "var(--surface, #fff)",
           border: "1px solid var(--border, #e2e2de)",
           borderRadius: "var(--radius, 0)",
@@ -78,19 +209,14 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           color: "var(--text-primary)",
         }}
       >
-        {/* title */}
+        {/* header */}
         <div style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 24,
         }}>
-          <h2 style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 500,
-            letterSpacing: "-0.01em",
-          }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 500 }}>
             设置
           </h2>
           <button
@@ -109,64 +235,42 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           </button>
         </div>
 
-        {/* DeepSeek */}
-        <label style={{
-          display: "block",
-          fontSize: 13,
-          fontWeight: 500,
-          marginBottom: 6,
-          color: "var(--text-secondary)",
-        }}>
-          DeepSeek API Key
-        </label>
-        <input
-          type="password"
-          value={deepseek}
-          onChange={(e) => setDeepseek(e.target.value)}
-          placeholder="sk-..."
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "10px 12px",
-            marginBottom: 20,
-            fontSize: 14,
-            fontFamily: "var(--font-mono)",
-            border: "1px solid var(--border, #e2e2de)",
-            borderRadius: "var(--radius, 0)",
-            background: "var(--bg, #fafafa)",
-            color: "var(--text-primary)",
-            outline: "none",
-          }}
+        {/* LLM section */}
+        <ProviderSection
+          title="LLM 语音理解"
+          desc="选择用于解析语音指令的大语言模型厂商"
+          providers={llmProviders}
+          activeId={settings.llm.active}
+          onActiveChange={(id) =>
+            setSettings((prev) =>
+              prev
+                ? { ...prev, llm: { ...prev.llm, active: id } }
+                : prev,
+            )
+          }
+          onProviderChange={(id, patch) => updateProvider("llm", id, patch)}
         />
 
-        {/* DashScope */}
-        <label style={{
-          display: "block",
-          fontSize: 13,
-          fontWeight: 500,
-          marginBottom: 6,
-          color: "var(--text-secondary)",
-        }}>
-          通义万相 DashScope API Key
-        </label>
-        <input
-          type="password"
-          value={dashscope}
-          onChange={(e) => setDashscope(e.target.value)}
-          placeholder="sk-..."
-          style={{
-            width: "100%",
-            boxSizing: "border-box",
-            padding: "10px 12px",
-            marginBottom: 24,
-            fontSize: 14,
-            fontFamily: "var(--font-mono)",
-            border: "1px solid var(--border, #e2e2de)",
-            borderRadius: "var(--radius, 0)",
-            background: "var(--bg, #fafafa)",
-            color: "var(--text-primary)",
-            outline: "none",
-          }}
+        {/* 分隔线 */}
+        <div style={{
+          borderTop: "1px solid var(--border, #e2e2de)",
+          marginBottom: 24,
+        }} />
+
+        {/* Image section */}
+        <ProviderSection
+          title="图像生成"
+          desc="选择用于风格转换的图像生成模型厂商"
+          providers={imgProviders}
+          activeId={settings.image.active}
+          onActiveChange={(id) =>
+            setSettings((prev) =>
+              prev
+                ? { ...prev, image: { ...prev.image, active: id } }
+                : prev,
+            )
+          }
+          onProviderChange={(id, patch) => updateProvider("image", id, patch)}
         />
 
         {/* save */}
@@ -188,10 +292,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             保存
           </button>
           {saved && (
-            <span style={{
-              fontSize: 13,
-              color: "var(--accent, #43a047)",
-            }}>
+            <span style={{ fontSize: 13, color: "var(--accent, #43a047)" }}>
               已保存 ✓
             </span>
           )}
@@ -203,7 +304,8 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           color: "var(--text-secondary)",
           lineHeight: 1.6,
         }}>
-          未填写则使用环境变量（DEEPSEEK_API_KEY / DASHSCOPE_API_KEY）。
+          未填写 API Key 则使用对应的环境变量。
+          添加新厂商只需在代码中扩展 provider 列表即可。
         </p>
       </div>
     </>
