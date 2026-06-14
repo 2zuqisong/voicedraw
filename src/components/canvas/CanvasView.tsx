@@ -612,7 +612,11 @@ function logStyleTransfer(message: string, detail?: string) {
   }
 }
 
-/** 从 Fabric.js canvas 中裁剪指定区域为独立 PNG（base64 data URL） */
+/** DashScope API 最小尺寸要求 */
+const MIN_API_IMAGE_SIZE = 512;
+
+/** 从 Fabric.js canvas 中裁剪指定区域为独立 PNG（base64 data URL）。
+ *  小图自动等比放大至不低于 512px，满足 DashScope API 最低尺寸。 */
 function cropCanvasRegion(
   canvas: fabric.Canvas,
   bounds: { left: number; top: number; width: number; height: number },
@@ -625,10 +629,23 @@ function cropCanvasRegion(
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
+      const w = Math.round(bounds.width);
+      const h = Math.round(bounds.height);
+
+      // 如果尺寸小于 API 要求，等比放大
+      const minDim = Math.min(w, h);
+      const scale = minDim < MIN_API_IMAGE_SIZE
+        ? MIN_API_IMAGE_SIZE / minDim
+        : 1;
+
       const offscreen = document.createElement("canvas");
-      offscreen.width = Math.round(bounds.width);
-      offscreen.height = Math.round(bounds.height);
+      offscreen.width = Math.round(w * scale);
+      offscreen.height = Math.round(h * scale);
       const ctx = offscreen.getContext("2d")!;
+
+      // 高质量缩放
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(
         img,
         bounds.left,
@@ -637,8 +654,8 @@ function cropCanvasRegion(
         bounds.height,
         0,
         0,
-        bounds.width,
-        bounds.height,
+        offscreen.width,
+        offscreen.height,
       );
       resolve(offscreen.toDataURL("image/png"));
     };
