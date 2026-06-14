@@ -5,6 +5,7 @@ import OperationPreview from "./components/canvas/OperationPreview";
 import ChatBubble from "./components/status/ChatBubble";
 import TopBar from "./components/layout/TopBar";
 import VoiceBar from "./components/layout/VoiceBar";
+import ShapePalette from "./components/layout/ShapePalette";
 import Toast from "./components/status/Toast";
 import { useAppStore } from "./store";
 import "./App.css";
@@ -24,6 +25,7 @@ function App() {
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
         <CanvasView canvasState={canvasState} />
         <CanvasOverlay />
+        <ShapePalette />
         <OperationPreview />
         <ChatBubble />
         <VoiceBar />
