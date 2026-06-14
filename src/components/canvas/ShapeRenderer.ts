@@ -118,15 +118,17 @@ export function renderCompositeShape(
   for (const sub of subShapes) {
     const obj = renderSubShape(sub);
     if (obj) {
-      obj.set({ left: sub.rel_x, top: sub.rel_y });
+      // 使用绝对画布坐标，让 Fabric Group 正确处理内部坐标变换
+      obj.set({
+        left: node.position.x + sub.rel_x,
+        top: node.position.y + sub.rel_y,
+      });
       objects.push(obj);
     }
   }
 
-  return new fabric.Group(objects, {
-    left: node.position.x,
-    top: node.position.y,
-  });
+  // 不传 left/top，让 Fabric 根据子对象绝对坐标自动计算 Group 位置
+  return new fabric.Group(objects);
 }
 
 /** 渲染单个子组件 */
@@ -145,15 +147,13 @@ function renderSubShape(sub: SubShape): fabric.Object | null {
     case "circle": {
       const r = sub.radius ?? Math.min(sub.width, sub.height) / 2;
       return new fabric.Ellipse({
-        left: r,
-        top: r,
+        left: 0,
+        top: 0,
         rx: r,
         ry: r,
         fill: sub.fill,
         stroke: sub.stroke,
         strokeWidth: sub.stroke_width,
-        originX: "center",
-        originY: "center",
       });
     }
 
@@ -181,15 +181,13 @@ function renderSubShape(sub: SubShape): fabric.Object | null {
 
     case "arc": {
       return new fabric.Ellipse({
-        left: sub.width / 2,
+        left: 0,
         top: 0,
         rx: sub.width / 2,
         ry: sub.height,
         fill: sub.fill,
         stroke: sub.stroke,
         strokeWidth: sub.stroke_width,
-        originX: "center",
-        originY: "top",
       });
     }
 
