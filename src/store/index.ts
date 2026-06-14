@@ -85,10 +85,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   // ── 像素模式 ──
   canvasMode: "vector",
   pixel: createDefaultPixel(),
-  setCanvasMode: (mode) => {
-    // 切换模式时清空对话历史和回复，防止跨模式污染
-    set({ canvasMode: mode, lastOperation: "", conversation: [] });
-  },
+  setCanvasMode: (mode) => set({ canvasMode: mode }),
 
   /** 从 canvasState.pixel 同步到本地 Zustand（LLM 修改后触发） */
   _syncPixelFromCanvas: () => {
