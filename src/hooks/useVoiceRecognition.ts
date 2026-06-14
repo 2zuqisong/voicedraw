@@ -70,8 +70,14 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
   }, [lang]); // 只挂载一次
 
   const start = useCallback(() => {
-    capturingRef.current = true;
     transcriptRef.current = "";
+    // 重启 recognition 清空浏览器语音缓冲区，防止上次录音残留
+    const r = recognitionRef.current;
+    if (r) {
+      try { r.abort(); } catch { /* 忽略 */ }
+      try { r.start(); } catch { /* 忽略 */ }
+    }
+    capturingRef.current = true;
   }, []);
 
   const stop = useCallback(() => {
@@ -81,13 +87,10 @@ export function useVoiceRecognition(options: UseVoiceRecognitionOptions) {
   const abort = useCallback(() => {
     capturingRef.current = false;
     transcriptRef.current = "";
-    // 重启 recognition 清空内部缓冲区
     const r = recognitionRef.current;
     if (r) {
       try { r.abort(); } catch { /* 忽略 */ }
-      setTimeout(() => {
-        try { r.start(); } catch { /* 忽略 */ }
-      }, 50);
+      try { r.start(); } catch { /* 忽略 */ }
     }
   }, []);
 
