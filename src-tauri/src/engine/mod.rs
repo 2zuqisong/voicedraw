@@ -19,6 +19,8 @@ pub struct AppEngine {
     pub canvas: Mutex<Option<CanvasState>>,
     pub snapshots: Mutex<snapshot::SnapshotManager>,
     pub context: Mutex<crate::preprocessor::context_enrich::ConversationContext>,
+    /// 临时存放待前端执行的异步操作（如 apply_style），scheduler 写入、execute_full 读取后清空
+    pub pending_action: Mutex<Option<canvas_state::PendingAction>>,
 }
 
 impl AppEngine {
@@ -40,6 +42,7 @@ impl AppEngine {
             canvas: Mutex::new(Some(default_canvas)),
             snapshots: Mutex::new(snapshot::SnapshotManager::new(20)),
             context: Mutex::new(crate::preprocessor::context_enrich::ConversationContext::new()),
+            pending_action: Mutex::new(None),
         }
     }
 }

@@ -419,11 +419,12 @@ impl LLMScheduler {
         }
 
         let canvas_state = engine.canvas.lock().unwrap().clone();
+        let pending_action = engine.pending_action.lock().unwrap().take();
 
         Ok(SchedulerResult {
             message: final_content,
             canvas_state,
-            pending_action: None,
+            pending_action,
         })
     }
 }
@@ -739,6 +740,36 @@ fn execute_tool_call(
                 "pixel_x": px,
                 "pixel_y": py,
                 "message": format!("推荐锚点: 网格({}, {}), 像素({}, {})", gx, gy, px, py)
+            })
+            .to_string())
+        }
+        "apply_style" => {
+            let prompt = args["prompt"].as_str().unwrap_or("艺术风格").to_string();
+            let node_ids: Vec<String> = args["node_ids"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let target_desc = if node_ids.is_empty() {
+                "整个画布".to_string()
+            } else {
+                format!("{} 个节点", node_ids.len())
+            };
+
+            let mut pa = engine.pending_action.lock().unwrap();
+            *pa = Some(crate::engine::canvas_state::PendingAction {
+                action_type: "apply_style".into(),
+                prompt,
+                node_ids,
+            });
+
+            Ok(serde_json::json!({
+                "success": true,
+                "message": format!("风格转换指令已接收，将对 {} 应用风格", target_desc)
             })
             .to_string())
         }
