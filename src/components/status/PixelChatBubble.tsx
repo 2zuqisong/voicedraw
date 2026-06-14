@@ -15,7 +15,7 @@ export default function PixelChatBubble() {
     <div
       style={{
         position: "absolute",
-        top: 72,
+        top: 16,
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 90,
