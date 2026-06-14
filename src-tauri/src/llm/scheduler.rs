@@ -1008,6 +1008,41 @@ fn execute_tool_call(
             }
             Ok(serde_json::json!({"success": true, "message": "像素画布已清空"}).to_string())
         }
+        "pixel_emoji" => {
+            use crate::engine::canvas_state::PixelCanvas;
+            let name = args["emoji"].as_str().ok_or("缺少 emoji 名称")?;
+            let row = args["row"].as_u64().unwrap_or(0) as i32;
+            let col = args["col"].as_u64().unwrap_or(0) as i32;
+
+            let (w, h, emoji_cells) = crate::engine::emoji_patterns::get_emoji(name)
+                .ok_or(format!("未知表情: {}。支持: {}", name, crate::engine::emoji_patterns::emoji_names().join(", ")))?;
+
+            if state.pixel.is_none() {
+                state.pixel = Some(PixelCanvas {
+                    cells: std::collections::HashMap::new(),
+                    cell_size: 20,
+                    cols: 32,
+                    rows: 32,
+                });
+            }
+            let pixel = state.pixel.as_mut().unwrap();
+            let mut count = 0;
+            for (r, c, color) in emoji_cells {
+                let rr = r + row;
+                let cc = c + col;
+                if rr >= 0 && rr < pixel.rows as i32 && cc >= 0 && cc < pixel.cols as i32 {
+                    pixel.cells.insert(format!("{},{}", rr, cc), color.to_string());
+                    count += 1;
+                }
+            }
+            Ok(serde_json::json!({
+                "success": true,
+                "emoji": name,
+                "size": format!("{}x{}", w, h),
+                "cells": count,
+                "position": {"row": row, "col": col}
+            }).to_string())
+        }
         _ => {
             log::error!("未知工具调用: {}", name);
             Err(format!("未知工具: {}", name))

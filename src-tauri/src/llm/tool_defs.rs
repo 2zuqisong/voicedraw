@@ -235,6 +235,23 @@ pub fn get_tool_definitions() -> Vec<ChatCompletionTool> {
         ),
         // ── 像素绘画工具 ─────────────────────────────────────────────
         tool(
+            "pixel_emoji",
+            "在像素画布上放置表情小人。用户说'画笑脸'/'发一个笑哭'/'放一个爱心眼'时调用。注意：每个表情占 16×16 格子。",
+            json!({
+                "type": "object",
+                "properties": {
+                    "emoji": {
+                        "type": "string",
+                        "enum": ["smile", "laugh", "heart_eyes", "angry", "cry", "cool", "shock", "wink"],
+                        "description": "表情名称：smile=笑脸, laugh=笑哭, heart_eyes=爱心眼, angry=生气, cry=哭泣, cool=酷墨镜, shock=惊讶, wink=眨眼吐舌"
+                    },
+                    "row": {"type": "integer", "description": "表情左上角行号（0-16）。建议放左边用0，右边用0或16"},
+                    "col": {"type": "integer", "description": "表情左上角列号（0-16）。放左边用0，右边用16"}
+                },
+                "required": ["emoji", "row", "col"]
+            }),
+        ),
+        tool(
             "pixel_set",
             "设置像素格子颜色。用于在像素画布上画点、线或区域。可以一次设置多个格子，每个格子指定行列和颜色。颜色为 hex 格式如 #ff0000。不指定颜色则擦除该格子。",
             json!({
