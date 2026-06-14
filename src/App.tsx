@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import CanvasView from "./components/canvas/CanvasView";
+import PixelCanvas from "./components/canvas/PixelCanvas";
+import PixelToolbar from "./components/canvas/PixelToolbar";
 import CanvasOverlay from "./components/canvas/CanvasOverlay";
 import OperationPreview from "./components/canvas/OperationPreview";
 import ChatBubble from "./components/status/ChatBubble";
@@ -12,6 +14,7 @@ import "./App.css";
 
 function App() {
   const canvasState = useAppStore((s) => s.canvasState);
+  const canvasMode = useAppStore((s) => s.canvasMode);
   const initEventListener = useAppStore((s) => s._initEventListener);
 
   useEffect(() => {
@@ -23,12 +26,21 @@ function App() {
       <Toast />
       <TopBar />
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        <CanvasView canvasState={canvasState} />
-        <CanvasOverlay />
-        <ShapePalette />
-        <OperationPreview />
-        <ChatBubble />
-        <VoiceBar />
+        {canvasMode === "pixel" ? (
+          <>
+            <PixelCanvas />
+            <PixelToolbar />
+          </>
+        ) : (
+          <>
+            <CanvasView canvasState={canvasState} />
+            <CanvasOverlay />
+            <ShapePalette />
+            <OperationPreview />
+            <ChatBubble />
+            <VoiceBar />
+          </>
+        )}
       </div>
     </div>
   );
