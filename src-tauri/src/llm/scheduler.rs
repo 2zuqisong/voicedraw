@@ -261,14 +261,30 @@ impl LLMScheduler {
     ) -> Result<SchedulerResult, String> {
         let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
 
-        // 1. System prompt（像素模式时前置强指令，覆盖矢量示例）
+        // 1. System prompt — 按模式物理隔离，LLM 看不到另一模式的工具
         let system_prompt_raw = get_system_prompt();
+        let pixel_section_start = system_prompt_raw.find("## 像素绘画模式");
         let system_prompt = match self.canvas_mode.as_deref() {
-            Some("pixel") => format!(
-                "## 🎨 当前模式：像素绘画\n\n你只能使用像素工具：pixel_set, pixel_fill, pixel_rect, pixel_clear。\n绝对禁止使用矢量工具（add_node, add_nodes_batch, add_edge 等）。\n即使指令看起来需要矢量图形，也要用像素格子画出来。\n\n{}",
-                system_prompt_raw
-            ),
-            _ => system_prompt_raw,
+            Some("pixel") => {
+                // 只给像素模式指令，彻底屏蔽矢量工具
+                let pixel_content = pixel_section_start
+                    .map(|i| &system_prompt_raw[i..])
+                    .unwrap_or(&system_prompt_raw);
+                format!(
+                    "你是像素绘画助手。只能使用：pixel_emoji, pixel_rect, pixel_fill, pixel_set, pixel_clear。\n绝对禁止使用 add_node, add_nodes_batch, add_edge 等矢量工具。\n\n{}",
+                    pixel_content
+                )
+            },
+            _ => {
+                // 矢量模式 — 屏蔽像素章节
+                match pixel_section_start {
+                    Some(i) => {
+                        let vector_part = system_prompt_raw[..i].trim_end().to_string();
+                        format!("{}\n\n注意：当前是矢量模式，使用矢量工具（add_node, add_edge 等），不要使用像素工具。", vector_part)
+                    }
+                    None => system_prompt_raw,
+                }
+            },
         };
         messages.push(
             ChatCompletionRequestSystemMessageArgs::default()
