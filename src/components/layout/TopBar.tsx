@@ -18,6 +18,7 @@ export default function TopBar() {
 
   return (
     <>
+      {/* title — top-left */}
       <div
         style={{
           position: "absolute",
@@ -43,27 +44,6 @@ export default function TopBar() {
           voice-draw
         </span>
 
-        {/* settings gear */}
-        <button
-          onClick={toggleSettings}
-          title="API 设置"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: 15,
-            padding: "2px 4px",
-            lineHeight: 1,
-            color: "var(--text-secondary)",
-            opacity: 0.45,
-            transition: "opacity 0.15s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.45")}
-        >
-          ⚙
-        </button>
-
         {isActive && (
           <span style={{
             color: "var(--accent)",
@@ -74,6 +54,42 @@ export default function TopBar() {
           </span>
         )}
       </div>
+
+      {/* settings — top-right */}
+      <button
+        onClick={toggleSettings}
+        title="API 设置"
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 16,
+          zIndex: 80,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 40,
+          height: 40,
+          fontSize: 22,
+          lineHeight: 1,
+          background: "var(--surface, #fff)",
+          border: "1px solid var(--border, #d4d4ce)",
+          borderRadius: "var(--radius, 4px)",
+          color: "var(--text-primary, #1a1a1a)",
+          cursor: "pointer",
+          opacity: 0.8,
+          transition: "opacity 0.15s, background 0.15s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = "1";
+          e.currentTarget.style.background = "var(--border, #e2e2de)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = "0.8";
+          e.currentTarget.style.background = "var(--surface, #fff)";
+        }}
+      >
+        ⚙
+      </button>
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
