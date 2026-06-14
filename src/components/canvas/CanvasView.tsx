@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import * as fabric from "fabric";
+import { invoke } from "@tauri-apps/api/core";
 import { initFabricCanvas } from "../../lib/fabric-setup";
-import type { CanvasState } from "../../store/types";
+import type { CanvasState, StyleTransferResult } from "../../store/types";
+import { useAppStore } from "../../store";
 import {
   renderBasicShape,
   renderCompositeShape,
@@ -117,6 +119,149 @@ export default function CanvasView({ canvasState }: CanvasViewProps) {
       renderCanvasState(canvas, canvasState);
     }
   }, [canvasState]);
+
+  // 检测 pendingAction（如风格转换），执行前端侧操作
+  const pendingAction = useAppStore((s) => s.pendingAction);
+  const clearPendingAction = useAppStore((s) => s.clearPendingAction);
+  const setStatus = useAppStore((s) => s.setStatus);
+  const pendingActionRef = useRef(false);
+
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas || !pendingAction || pendingActionRef.current) return;
+
+    if (pendingAction.action_type !== "apply_style") return;
+
+    pendingActionRef.current = true;
+    logStyleTransfer("开始捕获画布图像...", pendingAction.prompt);
+
+    // Step 1: 捕获 canvas 为 PNG base64
+    const dataUrl = canvas.toDataURL({
+      format: "png",
+      multiplier: 1,
+    });
+
+    logStyleTransfer("正在调用 DashScope 风格转换 API...");
+
+    // Step 2: 调用 Tauri command
+    invoke<StyleTransferResult>("apply_style_transfer", {
+      imageBase64: dataUrl,
+      prompt: pendingAction.prompt,
+      nodeIds: pendingAction.node_ids,
+    })
+      .then((result) => {
+        logStyleTransfer("风格转换完成，应用结果到画布...");
+
+        // Step 3: 记录目标节点的包围盒，然后移除
+        let targetBounds = { left: 40, top: 24, width: 200, height: 200 };
+        let foundBounds = false;
+
+        if (result.replaced_node_ids.length > 0) {
+          let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
+          const toRemove: fabric.Object[] = [];
+          canvas.getObjects().forEach((obj) => {
+            const data = (obj as any).data;
+            if (
+              data?.nodeId &&
+              result.replaced_node_ids.includes(data.nodeId)
+            ) {
+              const bounds = obj.getBoundingRect();
+              minX = Math.min(minX, bounds.left);
+              minY = Math.min(minY, bounds.top);
+              maxX = Math.max(maxX, bounds.left + bounds.width);
+              maxY = Math.max(maxY, bounds.top + bounds.height);
+              toRemove.push(obj);
+            }
+          });
+          toRemove.forEach((obj) => canvas.remove(obj));
+
+          if (isFinite(minX)) {
+            targetBounds = {
+              left: minX - 16,
+              top: minY - 8,
+              width: maxX - minX + 32,
+              height: maxY - minY + 16,
+            };
+            foundBounds = true;
+          }
+        } else {
+          // 整画布模式：包围盒覆盖所有非网格对象
+          let minX = Infinity,
+            minY = Infinity,
+            maxX = -Infinity,
+            maxY = -Infinity;
+          canvas.getObjects().forEach((obj) => {
+            if ((obj as any).isGridLine) return;
+            const bounds = obj.getBoundingRect();
+            minX = Math.min(minX, bounds.left);
+            minY = Math.min(minY, bounds.top);
+            maxX = Math.max(maxX, bounds.left + bounds.width);
+            maxY = Math.max(maxY, bounds.top + bounds.height);
+          });
+          if (isFinite(minX)) {
+            targetBounds = {
+              left: minX,
+              top: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            };
+            foundBounds = true;
+            // 移除所有非网格对象
+            const toRemove: fabric.Object[] = [];
+            canvas.getObjects().forEach((obj) => {
+              if (!(obj as any).isGridLine) toRemove.push(obj);
+            });
+            toRemove.forEach((obj) => canvas.remove(obj));
+          }
+        }
+
+        // Step 4: 将结果图片放到原节点位置
+        fabric.FabricImage.fromURL(result.image_base64).then((img) => {
+          if (!img) return;
+          const imgW = img.width!;
+          const imgH = img.height!;
+          const scaleX = targetBounds.width / imgW;
+          const scaleY = targetBounds.height / imgH;
+          const scale = foundBounds ? Math.min(scaleX, scaleY) : 1;
+
+          img.set({
+            left:
+              targetBounds.left +
+              (targetBounds.width - imgW * scale) / 2,
+            top:
+              targetBounds.top +
+              (targetBounds.height - imgH * scale) / 2,
+            scaleX: scale,
+            scaleY: scale,
+            selectable: true,
+            evented: true,
+          });
+          (img as any).data = {
+            nodeId: `styled_${Date.now()}`,
+            isStyledImage: true,
+          };
+          canvas.add(img);
+          canvas.requestRenderAll();
+          logStyleTransfer("风格转换完成！");
+        });
+
+        // 清理
+        clearPendingAction();
+        setStatus("idle");
+        pendingActionRef.current = false;
+      })
+      .catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        logStyleTransfer(`风格转换失败: ${msg}`);
+        clearPendingAction();
+        setStatus("error");
+        pendingActionRef.current = false;
+        setTimeout(() => setStatus("idle"), 3000);
+      });
+  }, [pendingAction, clearPendingAction, setStatus]);
 
   return (
     <div
@@ -451,5 +596,15 @@ function renderEdge(
       backgroundColor: "#fafafa",
     });
     canvas.add(label);
+  }
+}
+
+/** 风格转换流程日志（开发调试用） */
+function logStyleTransfer(message: string, detail?: string) {
+  const prefix = "[风格转换]";
+  if (detail) {
+    console.log(`${prefix} ${message}`, detail);
+  } else {
+    console.log(`${prefix} ${message}`);
   }
 }

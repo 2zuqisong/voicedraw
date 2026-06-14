@@ -18,6 +18,7 @@ pub fn run() {
             commands::confirm_plan,
             commands::cancel_plan,
             commands::modify_plan,
+            commands::apply_style_transfer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

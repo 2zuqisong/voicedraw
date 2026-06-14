@@ -209,6 +209,17 @@ impl Theme {
     }
 }
 
+/// 待前端执行的异步操作（如风格转换，需要前端先捕获 canvas 图像）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingAction {
+    /// 操作类型: "apply_style"
+    pub action_type: String,
+    /// 风格转换 prompt
+    pub prompt: String,
+    /// 目标节点 ID 列表（空 = 整个画布）
+    pub node_ids: Vec<String>,
+}
+
 /// Canvas 完整状态
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanvasState {

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan } from "./types";
+import type { CanvasState, AppStatus, ConversationMessage, OperationResult, OperationPlan, PendingAction } from "./types";
 
 interface AppState {
   // 语音状态
@@ -21,6 +21,10 @@ interface AppState {
   confirmPlan: () => Promise<void>;
   cancelPlan: () => Promise<void>;
   modifyPlan: (newText: string) => Promise<void>;
+
+  // 待前端执行的异步操作（如风格转换）
+  pendingAction: PendingAction | null;
+  clearPendingAction: () => void;
 
   // 动作
   startListening: () => void;
@@ -43,6 +47,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastOperation: "",
   conversation: [],
   pendingPlan: null,
+  pendingAction: null,
+  clearPendingAction: () => set({ pendingAction: null }),
 
   startListening: () => set({ isListening: true, status: "listening", transcript: "" }),
   
@@ -68,6 +74,18 @@ export const useAppStore = create<AppState>((set, get) => ({
           pendingPlan: result.pending_plan,
           status: "idle",
           lastOperation: result.message,
+        });
+      } else if (result.pending_action) {
+        // 异步操作（如风格转换）：存储 pendingAction，由 CanvasView 检测并执行
+        set({
+          pendingAction: result.pending_action,
+          status: "executing",
+          lastOperation: result.message,
+          conversation: [
+            ...get().conversation,
+            { role: "user" as const, content: text },
+            { role: "assistant" as const, content: result.message },
+          ].slice(-10),
         });
       } else if (result.success && result.canvas_state) {
         set({
